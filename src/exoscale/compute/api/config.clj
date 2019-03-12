@@ -17,7 +17,7 @@
 (defn make-path
   "Join path elements"
   [base & elems]
-  (Paths/get base (into-array String elems)))
+  (Paths/get (str base) (into-array String (map str elems))))
 
 (defn config-home
   "Find out where this system expects configurations to be stored"
@@ -33,7 +33,7 @@
 (defn files
   "Yield a sorted list of files within a directory, non-recursively"
   [path]
-  (sort-by str (.listFiles (io/file path))))
+  (sort-by str (.listFiles (io/file (str path)))))
 
 (def known-extensions
   "Known configuration file extensions"
@@ -41,9 +41,9 @@
 
 (defn valid?
   "Predicate to test for validity"
-  [{:keys [extension file prefix]}]
+  [{:keys [extension basename file prefix]}]
   (and (.isFile ^File file)
-       (= "exoscale" prefix)
+       (str/starts-with? basename "exoscale.")
        (contains? known-extensions extension)))
 
 (defmulti load-target
@@ -68,6 +68,7 @@
   [^File f]
   (let [elems (str/split (str f) #"\.")]
     {:prefix    (str/join "." (drop-last elems))
+     :basename  (.getName (io/file f))
      :extension (some-> elems last str/lower-case keyword)
      :file      f}))
 
@@ -79,26 +80,27 @@
          :when (valid? target)]
      (try
        (load-target target)
-       (catch Exception _)))))
+       (catch Exception e
+         (prn e))))))
 
 (defn find-account
   "Given a configuration, yield the designated account"
-  [{:keys [default defaultaccount accounts]} overrides]
-  (if-some [k (or (:default overrides)
-                  (System/getenv "EXOSCALE_ACCOUNT")
-                  default
-                  defaultaccount)]
-    (some->> accounts
-             (filter #(= (:name %) (name k)))
-             (first))
-    {}))
+  [{:keys [accounts]} account-name]
+  (or
+   (first
+    (filter #(= (:name %) (name account-name)) accounts))
+   {}))
 
 (defn environment-overrides
   "Fetch list of possible overrides from the environment"
   []
-  {:api-key    (System/getenv "EXOSCALE_API_KEY")
-   :api-secret (System/getenv "EXOSCALE_API_SECRET")
-   :endpoint   (System/getenv "EXOSCALE_ENDPOINT")})
+  (let [api-key    (System/getenv "EXOSCALE_API_KEY")
+        api-secret (System/getenv "EXOSCALE_API_SECRET")
+        endpoint   (System/getenv "EXOSCALE_ENDPOINT")]
+    (cond-> {}
+      (some? api-key)    (assoc :api-key api-key)
+      (some? api-secret) (assoc :api-secret api-secret)
+      (some? endpoint)   (assoc :endpoint endpoint))))
 
 (defn ^{:no-doc true} process-secret
   "If the api secret is configured to be provided
@@ -114,9 +116,11 @@
 
 (defn ^{:no-doc true} update-account
   ""
-  [{:keys [api-key key api-secret secret]}]
-  {:api-key    (or api-key key)
-   :api-secret (or api-secret secret)})
+  [{:keys [api-key key api-secret secret] :as config}]
+  (-> config
+      (assoc :api-key (or api-key key))
+      (assoc :api-secret (or api-secret secret))
+      (dissoc :key :secret)))
 
 
 (defn validate!
@@ -134,9 +138,8 @@
          account-name (or (:default overrides)
                           (System/getenv "EXOSCALE_ACCOUNT")
                           (:default cfg)
-                          (:defaultaccount cfg))
-         account      (find-account (:accounts cfg) )]
-     (-> (find-account cfg overrides)
+                          (:defaultaccount cfg))]
+     (-> (find-account cfg account-name)
          (update-account)
          (merge (environment-overrides))
          (merge (select-keys [:api-secret :api-secret :endpoint] overrides))
