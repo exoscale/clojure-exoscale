@@ -125,10 +125,12 @@
   (fn [{:keys [jobid] :as resp}]
     (if (some? jobid)
       (d/loop [remaining (or (:max-polls config) default-max-polls)]
-        ;; The previous response can be used as input
-        ;; to queryAsyncJobResult directly
-        (d/chain (json-request!! config "queryAsyncJobResult" resp)
-                 (wait-or-return-job!! config remaining opcode)))
+        (if (pos? remaining)
+          ;; The previous response can be used as input
+          ;; to queryAsyncJobResult directly
+          (d/chain (json-request!! config "queryAsyncJobResult" resp)
+                   (wait-or-return-job!! config remaining opcode))
+          resp))
       resp)))
 
 (defn job-request!!
