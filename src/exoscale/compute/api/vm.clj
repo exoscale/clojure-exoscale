@@ -61,22 +61,31 @@
 (defn sanitize-vm
   "Coerce API response into something a bit more useful"
   [resp]
-  (let [tag-acc #(assoc %1 (keyword (:key %2)) (:value %2))]
-    (-> (select-keys resp [:id :name :displayname :keypair :memory
-                           :cpunumber :group :password])
-        (assoc :security-groups (mapv sanitize-sg (:securitygroup resp)))
-        (assoc :template (sanitize-template resp))
-        (assoc :zone (:zonename resp))
-        (assoc :service-offering (-> resp :serviceofferingname str/lower-case keyword))
-        (assoc :state (-> resp :state str/lower-case keyword))
-        (assoc :tags (reduce tag-acc {} (:tags resp)))
+  (cond
+    (contains? resp :jobstatus)
+    (let [tag-acc #(assoc %1 (keyword (:key %2)) (:value %2))]
+      (-> (select-keys resp [:id :name :displayname :keypair :memory
+                             :cpunumber :group :password])
+          (assoc :security-groups (mapv sanitize-sg (:securitygroup resp)))
+          (assoc :template (sanitize-template resp))
+          (assoc :zone (:zonename resp))
+          (assoc :service-offering (-> resp :serviceofferingname str/lower-case keyword))
+          (assoc :state (-> resp :state str/lower-case keyword))
+          (assoc :tags (reduce tag-acc {} (:tags resp)))
+          (update-in [:id] client/parse-uuid)
+          (assoc :affinity-groups (mapv sanitize-ag (:affinitygroup resp)))
+          (assoc :public (sanitize-public (:nic resp)))
+          (assoc :nics (sanitize-nics (:nic resp)))
+          (meta/describe :exsocale.compute/vm resp)))
+
+    (contains? resp :id)
+    (-> resp
         (update-in [:id] client/parse-uuid)
-        (assoc :affinity-groups (mapv sanitize-ag (:affinitygroup resp)))
-        (assoc :public (sanitize-public (:nic resp)))
-        (assoc :nics (sanitize-nics (:nic resp)))
-        (meta/describe :exsocale.compute/vm resp))))
+        (update-in [:jobid] client/parse-uuid))
 
-
+    :else
+    (-> resp
+        (update-in [:jobid] client/parse-uuid))))
 
 (defn by-name
   "The infamous name resolver, using listVirtualMachines since
