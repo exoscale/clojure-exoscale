@@ -1,10 +1,9 @@
 (ns exoscale.compute.api.http
   "HTTP support for the Exoscale Compute API"
   (:require [clojure.string               :as str]
-            [cheshire.core                :as json]
             [aleph.http                   :as http]
             [manifold.deferred            :as d]
-            [byte-streams                 :as bs]
+            [manifold.time                :as t]
             [exoscale.compute.api.payload :as payload]))
 
 (def default-page-size
@@ -117,7 +116,7 @@
   (let [interval (or (:poll-interval config) default-poll-interval)]
     (fn [{:keys [jobstatus] :as job}]
       (if (zero? jobstatus)
-        (d/chain (d/future (Thread/sleep interval))
+        (d/chain (t/in interval (constantly nil))
                  (fn [_] (d/recur (dec remaining))))
         (job-result opcode job)))))
 
