@@ -165,6 +165,13 @@
            (fn [params] (client/api-call config :deploy-virtual-machine params))
            sanitize-vm))
 
+(defn destroy
+  "Destroy virtual machine"
+  [config target]
+  (d/chain (resolve-id config target)
+           #(client/api-call config :destroy-virtual-machine {:id %})
+           (constantly nil)))
+
 (defn ssh
   "Asynchronously reach out to a machine to execute an ssh command"
   [config target command]
@@ -231,5 +238,6 @@
 
   @(ssh config :clojure01 "echo hello")
   @(stop config :clojure01)
-
+  
+  @(destroy config :clojure01)
   )
