@@ -22,6 +22,12 @@
   "Default HTTP endpoint for the Exoscale API"
   "https://api.exoscale.com/compute")
 
+(def default-http-opts
+  "Default HTTP options passed to the underlying HTTP library (aleph)."
+  {:connection-timeout 10000
+   :request-timeout    10000
+   :read-timeout       10000})
+
 (def entity-special-cases
   {"resetPasswordForVirtualMachine"  [:reset-password :virtualmachine]
    "changeServiceForVirtualMachine"  [:change-service :virtualmachine]
@@ -54,7 +60,7 @@
 (defn raw-request!!
   "Send an HTTP request with manifold"
   [{:keys [endpoint http-opts] :as config} payload]
-  (let [opts   (merge http-opts {:as :json})
+  (let [opts   (merge default-http-opts http-opts {:as :json})
         method (some-> config :request-method name str/lower-case keyword)
         reqfn  (if (= :get method) http/get http/post)
         paramk (if (= :get method) :query-params :form-params)]

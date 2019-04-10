@@ -62,7 +62,7 @@
   "Coerce API response into something a bit more useful"
   [resp]
   (cond
-    (contains? resp :jobstatus)
+    (and (contains? resp :state) (not (nil? (:state resp))))
     (let [tag-acc #(assoc %1 (keyword (:key %2)) (:value %2))]
       (-> (select-keys resp [:id :name :displayname :keypair :memory
                              :cpunumber :group :password])
@@ -76,6 +76,7 @@
           (assoc :affinity-groups (mapv sanitize-ag (:affinitygroup resp)))
           (assoc :public (sanitize-public (:nic resp)))
           (assoc :nics (sanitize-nics (:nic resp)))
+          (assoc :created (:created resp))
           (meta/describe :exsocale.compute/vm resp)))
 
     (contains? resp :id)
