@@ -36,7 +36,7 @@
         (transform-maps (name k) v)
 
         (sequential? v)
-        [[k (str/join "," (map name v))]]
+        (map-indexed #([k (if (keyword? %) (name %) (str %))]) v)
 
         :else
         [[k (str v)]]))))
