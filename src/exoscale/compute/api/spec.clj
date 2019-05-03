@@ -9,6 +9,8 @@
 (spec/def :tmpl/template         string?)
 (spec/def :sg/securitygroupids   (spec/coll-of uuid?))
 (spec/def :sg/securitygroupnames (spec/coll-of string?))
+(spec/def :ag/affinitygroupids   (spec/coll-of uuid?))
+(spec/def :ag/affinitygroupnames (spec/coll-of string?))
 (spec/def :vm/name               string?)
 (spec/def :vm/displayname        string?)
 (spec/def :vm/group              string?)
@@ -18,6 +20,7 @@
 (spec/def :vm/startvm            boolean?)
 (spec/def :vm/userdata           string?)
 (spec/def :vm/keypair            string?)
+(spec/def :vm/networkids         (spec/coll-of uuid?))
 
 (spec/def :vm/forced?            boolean?)
 
@@ -33,6 +36,8 @@
                       (or :zone/zoneid :zone/zone)]
              :opt-un [:sg/securitygroupids
                       :sg/securitygroupnames
+                      :ag/affinitygroupids
+                      :ag/affinitygroupnames
                       :vm/displayname
                       :vm/group
                       :vm/ip4
@@ -41,7 +46,8 @@
                       :vm/name
                       :vm/rootdisksize
                       :vm/startvm
-                      :vm/userdata]))
+                      :vm/userdata
+                      :vm/networkids]))
 
 (spec/def :exoscale.compute/vm
   (spec/or :uuid uuid?
