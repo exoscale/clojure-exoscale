@@ -166,12 +166,40 @@
       (some? serviceoffering) (assoc :serviceofferingid sid)
       (some? template) (assoc :templateid tid))))
 
+(defn serialize-list
+  "Serialize the list in a coma separated list"
+  [v]
+  (str/join "," (map #(if (keyword? %) (name %) (str %)) v)))
+
+(defn sanitize-params
+  "CS expects list serialized as coma separated list of string. Aleph
+  explodes list into individual key-value pairs."
+  [{:keys [securitygroupids securitygroupnames affinitygroupids
+           affinitygroupnames networkids]
+    :as   params}]
+  (cond-> params
+    (some? securitygroupids)
+    (assoc :securitygroupids (serialize-list securitygroupids))
+
+    (some? securitygroupnames)
+    (assoc :securitygroupnames (serialize-list securitygroupnames))
+
+    (some? affinitygroupids)
+    (assoc :affinitygroupids (serialize-list affinitygroupids))
+
+    (some? affinitygroupnames)
+    (assoc :affinitygroupnames (serialize-list affinitygroupnames))
+
+    (some? networkids)
+    (assoc :networkids (serialize-list networkids))))
+
 (defn deploy
   "Deploy virtual machine"
   [config params]
   {:pre [(spec/valid? :exoscale.compute/vm params)]}
   (d/chain (resolve-indirect-params config params)
            (fn [resolved] (merge resolved (dissoc params :zone :template :serviceoffering)))
+           sanitize-params
            (fn [params] (client/api-call config :deploy-virtual-machine params))
            sanitize-vm))
 
