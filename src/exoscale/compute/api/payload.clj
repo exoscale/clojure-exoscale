@@ -4,6 +4,12 @@
             [exoscale.compute.api.hmac   :as hmac]
             [exoscale.compute.api.expiry :as expiry]))
 
+(defn stringify
+  [x]
+  (if (keyword? x)
+    (name x)
+    (str x)))
+
 (defn url-encode
   "Encode URL"
   [s]
@@ -29,14 +35,14 @@
   "Transform argument into a list of key/value pairs."
   [[k v]]
   (let [k (name k)
-        v (if (keyword? v) (name v) v)]
+        v (stringify v)]
     (when (or (and (sequential? v) (seq v)) (some? v))
       (cond
         (and (sequential? v) (-> v first map?))
         (transform-maps (name k) v)
 
         (sequential? v)
-        (map #(vector k (if (keyword? %) (name %) (str %))) v)
+        (map #(vector k (stringify %)) v)
 
         :else
         [[k (str v)]]))))
@@ -56,13 +62,22 @@
 ;;  (-> query str/lower-case quote-plus)
   )
 
+(defn sanitize-lists
+  [params]
+  (let [flat-list?    #(and (sequential? %) (not (map? (first %))))
+        sanitize-list #(str/join "," (map stringify %))]
+    (reduce-kv #(assoc %1 %2 (cond-> %3 (flat-list? %3) sanitize-list))
+               {}
+               params)))
+
 (defn build-payload
   "Build a signed payload for a given config, opcode and args triplet"
   ([config opcode params]
     (build-payload config (assoc params :command opcode)))
   ([{:keys [api-key api-secret ttl]} params]
-   (let [payload (merge (expiry/args ttl)
-                        (assoc params :apikey api-key :response "json"))]
+   (let [payload (-> (sanitize-lists params)
+                     (assoc :apikey api-key :response "json")
+                     (merge (expiry/args ttl)))]
      (assoc payload :signature (sign (query-args payload) api-secret))
      ;;(sign (query-args payload) api-secret)
      )))
