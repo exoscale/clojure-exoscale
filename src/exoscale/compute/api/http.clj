@@ -26,6 +26,7 @@
   "Default HTTP options passed to the underlying HTTP library (aleph)."
   {:connection-timeout 10000
    :request-timeout    10000
+   :pool-timeout       1000
    :read-timeout       10000})
 
 (def entity-special-cases
