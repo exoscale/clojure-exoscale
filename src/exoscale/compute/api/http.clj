@@ -2,6 +2,7 @@
   "HTTP support for the Exoscale Compute API"
   (:require [clojure.string               :as str]
             [aleph.http                   :as http]
+            [byte-streams                 :as bs]
             [manifold.deferred            :as d]
             [manifold.time                :as t]
             [exoscale.compute.api.payload :as payload]))
@@ -45,6 +46,19 @@
     (or (get special-plurals word)
         (drop-last s))))
 
+(defn with-decoded-error-body
+  "Catches potential deferred error and rethrow with decoded
+  ex-data.body if there is one, otherwise just rethrow"
+  [d]
+  (d/catch d clojure.lang.ExceptionInfo
+      (fn [e]
+        (let [d (ex-data e)]
+          (throw (if-let [body (:body d)]
+                   (ex-info (ex-message e)
+                            (assoc d :body (bs/to-string body))
+                            (ex-cause e))
+                   e))))))
+
 (def action-entity
   "Yield action type and target entity"
   ;; Results do not change over time and input cardinality is
@@ -65,7 +79,8 @@
         method (some-> config :request-method name str/lower-case keyword)
         reqfn  (if (= :get method) http/get http/post)
         paramk (if (= :get method) :query-params :form-params)]
-    (reqfn (or endpoint default-endpoint) (assoc opts paramk payload))))
+    (-> (reqfn (or endpoint default-endpoint) (assoc opts paramk payload))
+        with-decoded-error-body)))
 
 (defn extract-response
   "From a response get the result data"
