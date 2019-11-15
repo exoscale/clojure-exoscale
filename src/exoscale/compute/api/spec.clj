@@ -1,5 +1,17 @@
 (ns exoscale.compute.api.spec
-  (:require [clojure.spec.alpha :as spec]))
+  (:require [exoscale.compute.api.http :as http]
+            [clojure.spec.alpha :as spec]))
+
+(spec/def ::ne-string
+  (spec/and string? (complement clojure.string/blank?)))
+
+(def re-url?
+  (partial re-matches #"(?i)^http(s?)://.*"))
+
+(spec/def ::url
+  (spec/and
+   ::ne-string
+   re-url?))
 
 (spec/def :zone/zoneid           uuid?)
 (spec/def :zone/zone             string?)
@@ -54,11 +66,17 @@
            :name string?
            :vm   :exoscale.compute/vmdef))
 
-(spec/def :exoscale.compute.api.config/api-key string?)
-(spec/def :exoscale.compute.api.config/api-secret string?)
-(spec/def :exoscale.compute.api.config/endpoint string?)
+(spec/def :exoscale.compute.api.config/api-key ::ne-string)
+(spec/def :exoscale.compute.api.config/api-secret ::ne-string)
+(spec/def :exoscale.compute.api.config/endpoint ::url)
+(spec/def :exoscale.compute.api.config/max-polls int?)
+(spec/def :exoscale.compute.api.config/poll-interval #(>= % http/default-poll-interval))
+(spec/def :exoscale.compute.api.config/https-opts map?)
 
 (spec/def :exoscale.compute.api.config/client-opts
   (spec/keys :req-un [:exoscale.compute.api.config/api-key
                       :exoscale.compute.api.config/api-secret]
-             :opt-un [:exoscale.compute.api.config/endpoint]))
+             :opt-un [:exoscale.compute.api.config/endpoint
+                      :exoscale.compute.api.config/max-polls
+                      :exoscale.compute.api.config/poll-interval
+                      :exoscale.compute.api.config/https-opts]))
