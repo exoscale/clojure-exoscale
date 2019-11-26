@@ -35,3 +35,9 @@
    (http/request!! client (api-name opcode) {}))
   ([client opcode params]
    (http/request!! client (api-name opcode) params)))
+
+(comment
+  ;; Try it out!
+  (require '[exoscale.compute.api.config :as config])
+  (def config (config/from-environment))
+  )
