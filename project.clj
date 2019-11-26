@@ -1,4 +1,4 @@
-(defproject exoscale/exoscale "0.1.5"
+(defproject exoscale/exoscale "0.1.7-SNAPSHOT"
   :description "All things Exoscale, in Clojure"
   :url "https://github.com/exoscale/clojure-exoscale"
   :plugins [[lein-kibit      "0.1.6"]
@@ -8,6 +8,10 @@
   :codox {:source-uri  "https://github.com/exoscale/clojure-exoscale/blob/{version}/{filepath}#L{line}"
           :doc-files   ["doc/intro.md"]
           :metadata    {:doc/format :markdown}}
+
+  :deploy-repositories [["releases" :clojars]
+                        ["snapshots" :clojars]]
+
   :dependencies [[org.clojure/clojure "1.10.1"]
                  [cheshire            "5.8.1"]
                  [clj-time            "0.15.1"]

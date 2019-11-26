@@ -30,47 +30,23 @@
    :pool-timeout       1000
    :read-timeout       10000})
 
-(def entity-special-cases
-  {"resetPasswordForVirtualMachine"  [:reset-password :virtualmachine]
-   "changeServiceForVirtualMachine"  [:change-service :virtualmachine]
-   "migrateVirtualMachineWithVolume" [:migrate-with-volume :virtualmachine]})
-
-(def special-plurals
-  {"publicipaddresses" "publicipaddress"
-   "oscategories"      "oscategory"
-   "capabilities"      "capability"})
-
-(defn depluralize
-  [s]
-  (let [word (str/lower-case (reduce str "" s))]
-    (or (get special-plurals word)
-        (drop-last s))))
-
 (defn with-decoded-error-body
   "Catches potential deferred error and rethrow with decoded
   ex-data.body if there is one, otherwise just rethrow"
   [d]
   (d/catch d clojure.lang.ExceptionInfo
-      (fn [e]
-        (let [d (ex-data e)]
-          (throw (if-let [body (:body d)]
-                   (ex-info (ex-message e)
-                            (assoc d :body (bs/to-string body))
-                            (ex-cause e))
-                   e))))))
+    (fn [e]
+      (let [d (ex-data e)]
+        (throw (if-let [body (:body d)]
+                 (ex-info (ex-message e)
+                          (assoc d :body (bs/to-string body))
+                          (ex-cause e))
+                 e))))))
 
-(def action-entity
-  "Yield action type and target entity"
-  ;; Results do not change over time and input cardinality is
-  ;; small.
+(def list-command?
   (memoize
    (fn [opcode]
-     (or (get entity-special-cases opcode)
-         (let [keywordize      #(-> (reduce str %) str/lower-case keyword)
-               lower-case?     #(Character/isLowerCase (char %))
-               [action entity] (split-with lower-case? opcode)
-               plural?         (= \s (last entity))]
-           (mapv keywordize [action (cond->> entity plural? depluralize)]))))))
+     (-> opcode name (str/starts-with? "list")))))
 
 (defn raw-request!!
   "Send an HTTP request with manifold"
@@ -87,13 +63,19 @@
   [resp opcode]
   (get (:body resp) (-> opcode name str/lower-case (str "response") keyword)))
 
+(defn find-payload
+  [resp]
+  (let [ks (set (keys resp))]
+    (if (and (= 2 (count ks)) (contains? ks :count))
+      (-> resp (dissoc :count) vals first)
+      resp)))
+
 (defn transform
   ""
   [resp opcode]
-  (let [[action entity] (action-entity opcode)
-        payload         (or (get resp entity) resp)]
+  (let [payload (find-payload resp)]
     (cond-> payload
-      (= :list action)
+      (list-command? opcode)
       (with-meta (select-keys resp [:count])))))
 
 (defn text-request!!
@@ -128,11 +110,6 @@
         (d/chain (json-request!! config opcode paged-params)
                  (list-pager-fn opcode page result))))))
 
-(defn job-result
-  [opcode {:keys [jobresult]}]
-  (let [[_ entity] (action-entity opcode)]
-    (or (get jobresult entity) jobresult)))
-
 (defn wait-or-return-job!!
   [config remaining opcode]
   (let [interval (or (:poll-interval config) default-poll-interval)]
@@ -140,7 +117,7 @@
       (if (zero? jobstatus)
         (d/chain (t/in interval (constantly nil))
                  (fn [_] (d/recur (dec remaining))))
-        (job-result opcode job)))))
+        (-> job :jobresult vals first)))))
 
 (defn job-loop!!
   [config opcode]
@@ -170,7 +147,6 @@
   - For an async job request, wait for the job result
   - "
   [config opcode params]
-  (let [[action] (action-entity opcode)]
-    (if (= :list action)
-      (list-request!! config opcode params)
-      (job-request!! config opcode params))))
+  (if (list-command? opcode)
+    (list-request!! config opcode params)
+    (job-request!! config opcode params)))
