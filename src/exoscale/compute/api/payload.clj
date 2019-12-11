@@ -76,7 +76,7 @@
     (build-payload config (assoc params :command opcode)))
   ([{:keys [api-key api-secret ttl]} params]
    (let [payload (-> (sanitize-lists params)
-                     (assoc :apikey api-key :response "json")
+                     (assoc :apiKey api-key :response "json")
                      (merge (expiry/args ttl)))]
      (assoc payload :signature (sign (query-args payload) api-secret))
      ;;(sign (query-args payload) api-secret)
