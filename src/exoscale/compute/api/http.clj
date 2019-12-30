@@ -91,12 +91,13 @@
    ))
 
 (defn list-pager-fn
-  [opcode page prev-result]
+  [pending opcode page prev-result]
   (fn [resp]
-    (let [pending (- (:count (meta resp) 0) (count resp))
+    (let [pending (- (or pending (:count (meta resp) 0))
+                     (count resp))
           result  (concat prev-result resp)]
       (if (and (seq resp) (pos? pending))
-        (d/recur (inc page)  result pending)
+        (d/recur (inc page) result pending)
         (vec result)))))
 
 (defn list-request!!
@@ -106,9 +107,11 @@
     (d/loop [page    1
              result  []
              pending nil]
-      (let [paged-params (assoc params :page page :pagesize (or pending ps))]
+      (let [paged-params (assoc params
+                                :page page
+                                :pagesize ps)]
         (d/chain (json-request!! config opcode paged-params)
-                 (list-pager-fn opcode page result))))))
+                 (list-pager-fn pending opcode page result))))))
 
 (defn wait-or-return-job!!
   [config remaining opcode]
