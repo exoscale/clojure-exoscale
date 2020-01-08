@@ -67,7 +67,7 @@
   [resp]
   (let [ks (set (keys resp))
         payload (-> resp (dissoc :count) vals first)]
-    (if (and (not= 0 (count ks))
+    (if (and (pos? (count ks))
              (not (:jobid resp))
              (or (map? payload) (sequential? payload)))
       payload
