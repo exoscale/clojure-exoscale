@@ -65,9 +65,12 @@
 
 (defn find-payload
   [resp]
-  (let [ks (set (keys resp))]
-    (if (and (= 2 (count ks)) (contains? ks :count))
-      (-> resp (dissoc :count) vals first)
+  (let [ks (set (keys resp))
+        payload (-> resp (dissoc :count) vals first)]
+    (if (and (pos? (count ks))
+             (not (:jobid resp))
+             (or (map? payload) (sequential? payload)))
+      payload
       resp)))
 
 (defn transform
@@ -120,7 +123,7 @@
       (if (zero? jobstatus)
         (d/chain (t/in interval (constantly nil))
                  (fn [_] (d/recur (dec remaining))))
-        (-> job :jobresult vals first)))))
+        (find-payload (:jobresult job))))))
 
 (defn job-loop!!
   [config opcode]
