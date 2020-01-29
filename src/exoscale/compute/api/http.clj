@@ -133,7 +133,7 @@
         (if (pos? remaining)
           ;; The previous response can be used as input
           ;; to queryAsyncJobResult directly
-          (d/chain (json-request!! config "queryAsyncJobResult" resp)
+          (d/chain (json-request!! config "queryAsyncJobResult" {:jobid jobid})
                    (wait-or-return-job!! config remaining opcode))
           resp))
       resp)))
