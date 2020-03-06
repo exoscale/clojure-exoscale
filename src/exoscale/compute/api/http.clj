@@ -64,22 +64,18 @@
   (get (:body resp) (-> opcode name str/lower-case (str "response") keyword)))
 
 (defn find-payload
-  [resp]
-  (let [ks (set (keys resp))
-        payload (-> resp (dissoc :count) vals first)]
-    (if (and (pos? (count ks))
-             (not (:jobid resp))
-             (or (map? payload) (sequential? payload)))
-      payload
-      resp)))
-
-(defn transform
-  ""
   [resp opcode]
-  (let [payload (find-payload resp)]
-    (cond-> payload
-      (list-command? opcode)
-      (with-meta (select-keys resp [:count])))))
+  (let [list?      (list-command? opcode)
+        ks         (set (keys resp))
+        payload    (-> resp (dissoc :count) vals first)
+        elem-count (or (:count resp) 0)]
+    (cond
+      (and list? (empty? payload)) (with-meta [] {:count elem-count})
+      list?                        (with-meta payload {:count elem-count})
+      (some (:jobid resp))         resp
+      (map? payload)               payload
+      (sequential? payload)        payload
+      :else                        resp)))
 
 (defn text-request!!
   [config opcode params]
@@ -90,31 +86,33 @@
   (d/chain
    (raw-request!! config (payload/build-payload config opcode params))
    #(extract-response % opcode)
-   #(transform % opcode)
-   ))
+   #(find-payload % opcode)))
 
 (defn list-pager-fn
-  [pending opcode page prev-result]
+  [pending page prev-result]
   (fn [resp]
     (let [pending (- (or pending (:count (meta resp) 0))
                      (count resp))
           result  (concat prev-result resp)]
       (if (and (seq resp) (pos? pending))
         (d/recur (inc page) result pending)
-        (vec result)))))
+        (with-meta (vec result) (meta resp))))))
 
 (defn list-request!!
   "Perform a paging request. Elements are fetched by chunks of 500."
-  [config opcode params]
-  (let [ps (or (:page-size config) default-page-size)]
-    (d/loop [page    1
-             result  []
-             pending nil]
-      (let [paged-params (assoc params
-                                :page page
-                                :pagesize ps)]
-        (d/chain (json-request!! config opcode paged-params)
-                 (list-pager-fn pending opcode page result))))))
+  [config
+   opcode
+   {:keys [page pagesize]
+    :or   {pagesize default-page-size
+           page     1}
+    :as   params}]
+  (d/loop [page    page
+           result  []
+           pending pagesize]
+    (d/chain (json-request!! config
+                             opcode
+                             (assoc params :page page :pagesize pagesize))
+             (list-pager-fn pending page result))))
 
 (defn wait-or-return-job!!
   [config remaining opcode]
@@ -123,7 +121,7 @@
       (if (zero? jobstatus)
         (d/chain (t/in interval (constantly nil))
                  (fn [_] (d/recur (dec remaining))))
-        (find-payload (:jobresult job))))))
+        (find-payload (:jobresult job) opcode)))))
 
 (defn job-loop!!
   [config opcode]
