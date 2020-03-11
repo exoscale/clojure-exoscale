@@ -72,7 +72,7 @@
     (cond
       (and list? (empty? payload)) (with-meta [] {:count elem-count})
       list?                        (with-meta payload {:count elem-count})
-      (some (:jobid resp))         resp
+      (some? (:jobid resp))        resp
       (map? payload)               payload
       (sequential? payload)        payload
       :else                        resp)))
