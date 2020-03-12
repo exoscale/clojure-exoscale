@@ -73,13 +73,10 @@
 (deftest pagination-max-500-test
   (let [spy (json-request-spy (range 0 600))]
     (with-redefs [http/json-request!! spy]
+      ;; When no page or pagesize are passed then we should load everything
+      ;; in batches of 500
       (let [res @(http/list-request!! {} "listZones" {})]
-        (is (= 500 (count res)))
+        (is (= 600 (count res)))
         (is (= 600 (:count (meta res))))
-        (assert/called-once-with? spy {} "listZones" {:page 1 :pagesize 500}))
-
-      (spy/reset-spy! spy)
-      (let [res @(http/list-request!! {} "listZones" {:page 2})]
-        (is (= 100 (count res)))
-        (is (= 600 (:count (meta res))))
-        (assert/called-once-with? spy {} "listZones" {:page 2 :pagesize 500})))))
+        (assert/called-with? spy {} "listZones" {:page 1 :pagesize 500})
+        (assert/called-with? spy {} "listZones" {:page 2 :pagesize 500})))))

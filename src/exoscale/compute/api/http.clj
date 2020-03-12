@@ -93,30 +93,23 @@
   [config
    opcode
    {:keys [page pagesize]
-    :or   {page     1}
+    :or   {page 1}
     :as   params}]
   (let [single-page-only? (some? pagesize)
-        params (assoc params
-                      :page page
-                      :pagesize (or pagesize default-page-size))]
+        pagesize (or pagesize default-page-size)]
     (d/loop [page    page
-             result  []
-             pagesize pagesize]
+             result  []]
       (d/chain (json-request!! config
                                opcode
-                               params)
+                               (assoc params :page page :pagesize pagesize))
                (fn [resp]
-                 (let [full-count (:count (meta resp))
-                       result  (concat result resp)
-                       last-page? (>= (+ (count resp) (* (or pagesize default-page-size) page)) full-count)
-                       all-results-present? (= full-count (count resp))]
-                   (if  (and (not single-page-only?)
-                             (not last-page?)
-                             (not all-results-present?)
-                             (seq resp)
-                             (pos? pagesize))
-                     (d/recur (inc page) result pagesize)
-                     (with-meta (vec result) (meta resp)))))))))
+                 (let [result (concat result resp)
+                       all-results-present? (= (:count (meta resp)) (count resp))]
+                   (if (or single-page-only?
+                           all-results-present?
+                           (not (seq resp)))
+                     (with-meta (vec result) (meta resp))
+                     (d/recur (inc page) result))))))))
 
 (defn wait-or-return-job!!
   [config remaining opcode]
