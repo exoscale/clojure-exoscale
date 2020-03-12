@@ -88,31 +88,35 @@
    #(extract-response % opcode)
    #(find-payload % opcode)))
 
-(defn list-pager-fn
-  [pending page prev-result]
-  (fn [resp]
-    (let [pending (- (or pending (:count (meta resp) 0))
-                     (count resp))
-          result  (concat prev-result resp)]
-      (if (and (seq resp) (pos? pending))
-        (d/recur (inc page) result pending)
-        (with-meta (vec result) (meta resp))))))
-
 (defn list-request!!
   "Perform a paging request. Elements are fetched by chunks of 500."
   [config
    opcode
    {:keys [page pagesize]
-    :or   {pagesize default-page-size
-           page     1}
+    :or   {page     1}
     :as   params}]
-  (d/loop [page    page
-           result  []
-           pending pagesize]
-    (d/chain (json-request!! config
-                             opcode
-                             (assoc params :page page :pagesize pagesize))
-             (list-pager-fn pending page result))))
+  (let [single-page-only? (some? pagesize)
+        params (assoc params
+                      :page page
+                      :pagesize (or pagesize default-page-size))]
+    (d/loop [page    page
+             result  []
+             pagesize pagesize]
+      (d/chain (json-request!! config
+                               opcode
+                               params)
+               (fn [resp]
+                 (let [full-count (:count (meta resp))
+                       result  (concat result resp)
+                       last-page? (>= (+ (count resp) (* (or pagesize default-page-size) page)) full-count)
+                       all-results-present? (= full-count (count resp))]
+                   (if  (and (not single-page-only?)
+                             (not last-page?)
+                             (not all-results-present?)
+                             (seq resp)
+                             (pos? pagesize))
+                     (d/recur (inc page) result pagesize)
+                     (with-meta (vec result) (meta resp)))))))))
 
 (defn wait-or-return-job!!
   [config remaining opcode]
