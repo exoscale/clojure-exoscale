@@ -88,31 +88,32 @@
    #(extract-response % opcode)
    #(find-payload % opcode)))
 
-(defn list-pager-fn
-  [pending page prev-result]
-  (fn [resp]
-    (let [pending (- (or pending (:count (meta resp) 0))
-                     (count resp))
-          result  (concat prev-result resp)]
-      (if (and (seq resp) (pos? pending))
-        (d/recur (inc page) result pending)
-        (with-meta (vec result) (meta resp))))))
-
 (defn list-request!!
-  "Perform a paging request. Elements are fetched by chunks of 500."
-  [config
-   opcode
-   {:keys [page pagesize]
-    :or   {pagesize default-page-size
-           page     1}
-    :as   params}]
-  (d/loop [page    page
-           result  []
-           pending pagesize]
-    (d/chain (json-request!! config
-                             opcode
-                             (assoc params :page page :pagesize pagesize))
-             (list-pager-fn pending page result))))
+  "Perform a paging request. Elements are fetched by chunks of 500.
+   If both `page` and `pagesize` are provided then we return a single page only,
+   Otherwise fetch all results page by page.
+
+  This functionality is dependent on the api call supporting pagination,
+  `listZones` and `listSecurityGroups` are examples of this.
+
+  Custom Exoscale commands that are not present in Cloudstack such as
+  `listApiKeys` return the full list and do not support pagination."
+  [config opcode {:keys [page pagesize] :or {page 1} :as params}]
+  (let [single-page-only? (and (some? pagesize) (some? page))
+        pagesize (or pagesize default-page-size)]
+    (d/loop [page page
+             acc []]
+      (d/chain (json-request!! config opcode (assoc params
+                                                    :page page
+                                                    :pagesize pagesize))
+               (fn [resp]
+                 (let [acc (concat acc resp)
+                       all-results-present? (= (:count (meta resp)) (count resp))]
+                   (if (or single-page-only?
+                           all-results-present?
+                           (not (seq resp)))
+                     (with-meta (vec acc) (meta resp))
+                     (d/recur (inc page) acc))))))))
 
 (defn wait-or-return-job!!
   [config remaining opcode]

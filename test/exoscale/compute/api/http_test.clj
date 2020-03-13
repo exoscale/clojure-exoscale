@@ -1,29 +1,82 @@
 (ns exoscale.compute.api.http-test
-  (:require [clojure.test :refer :all]
-            [exoscale.compute.api.http :as http]))
+  (:require [clojure.test :refer [deftest testing is]]
+            [manifold.deferred :as d]
+            [exoscale.compute.api.http :as http]
+            [spy.core :as spy]
+            [spy.assert :as assert]))
 
 (deftest find-payload-test
   (testing "map with a top level key"
     (is (= {:id "bar"}
-           (http/find-payload {:network {:id "bar"}}))))
+           (http/find-payload {:network {:id "bar"}} :someMutation))))
   (testing "vector with a top level key"
     (is (= [{:id "bar"}]
-           (http/find-payload {:network [{:id "bar"}]}))))
+           (http/find-payload {:network [{:id "bar"}]} :someMutation))))
   (testing "map with one element"
     (is (= {:success true}
-           (http/find-payload {:success true}))))
+           (http/find-payload {:success true} :someMutation))))
   (testing "map with multiple elements"
     (is (= {:id "bar"
             :name "foo"}
-           (http/find-payload {:id "bar"
-                               :name "foo"}))))
+           (http/find-payload {:id "bar" :name "foo"} :someMutation))))
   (testing "empty map"
     (is (= {}
-           (http/find-payload {}))))
+           (http/find-payload {} :someMutation))))
   (testing "map containinb a :jobid key"
     (is (= {:jobid "dac8bd04-31ff-11ea-ba11-6bef69b2ab5f"}
-           (http/find-payload {:jobid "dac8bd04-31ff-11ea-ba11-6bef69b2ab5f"}))))
+           (http/find-payload {:jobid "dac8bd04-31ff-11ea-ba11-6bef69b2ab5f"} :someMutation))))
   (testing "vector"
     (is (= [{:id "bar"}]
-           (http/find-payload {:network [{:id "bar"}]
-                               :count 1})))))
+           (http/find-payload {:network [{:id "bar"}] :count 1} :someMutation)))))
+
+(defn json-request-spy [items]
+  (spy/spy (fn [config opcode {:keys [page pagesize]}]
+             (d/success-deferred (with-meta (->> items
+                                                 (drop (* (dec page) pagesize))
+                                                 (take pagesize)
+                                                 (map (fn [n]
+                                                        {:item n})))
+                                   {:count (count items)})))))
+
+(deftest pagination-no-params-test
+  (let [spy (json-request-spy (range 0 5))]
+    (with-redefs [http/json-request!! spy]
+      (let [res @(http/list-request!! {} "listZones" {})]
+        (is (= [{:item 0} {:item 1} {:item 2} {:item 3} {:item 4}] res))
+        (is (= 5 (:count (meta res))))
+        (assert/called-once-with? spy {} "listZones" {:page 1 :pagesize 500})))))
+
+(deftest pagination-first-page-test
+  (let [spy (json-request-spy (range 0 5))]
+    (with-redefs [http/json-request!! spy]
+      (let [res @(http/list-request!! {} "listZones" {:page 1 :pagesize 2})]
+        (is (= [{:item 0} {:item 1}] res))
+        (is (= 5 (:count (meta res))))
+        (assert/called-once-with? spy {} "listZones" {:page 1 :pagesize 2})))))
+
+(deftest pagination-second-page-test
+  (let [spy (json-request-spy (range 0 5))]
+    (with-redefs [http/json-request!! spy]
+      (let [res @(http/list-request!! {} "listZones" {:page 2 :pagesize 2})]
+        (is (= [{:item 2} {:item 3}] res))
+        (is (= 5 (:count (meta res))))
+        (assert/called-once-with? spy {} "listZones" {:page 2 :pagesize 2})))))
+
+(deftest pagination-last-page-test
+  (let [spy (json-request-spy (range 0 5))]
+    (with-redefs [http/json-request!! spy]
+      (let [res @(http/list-request!! {} "listZones" {:page 3 :pagesize 2})]
+        (is (= [{:item 4}] res))
+        (is (= 5 (:count (meta res))))
+        (assert/called-once-with? spy {} "listZones" {:page 3 :pagesize 2})))))
+
+(deftest pagination-max-500-test
+  (let [spy (json-request-spy (range 0 600))]
+    (with-redefs [http/json-request!! spy]
+      ;; When no page or pagesize are passed then we should load everything
+      ;; in batches of 500
+      (let [res @(http/list-request!! {} "listZones" {})]
+        (is (= 600 (count res)))
+        (is (= 600 (:count (meta res))))
+        (assert/called-with? spy {} "listZones" {:page 1 :pagesize 500})
+        (assert/called-with? spy {} "listZones" {:page 2 :pagesize 500})))))
