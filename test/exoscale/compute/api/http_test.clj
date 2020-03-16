@@ -80,3 +80,32 @@
         (is (= 600 (:count (meta res))))
         (assert/called-with? spy {} "listZones" {:page 1 :pagesize 500})
         (assert/called-with? spy {} "listZones" {:page 2 :pagesize 500})))))
+
+(deftest do-not-recur-if-count-missing-test
+  (let [spy (spy/stub (d/success-deferred (with-meta [:foo :bar :baz] {:count nil})))]
+    (with-redefs [http/json-request!! spy]
+      (let [res @(http/list-request!! {} "listZones" {})]
+        (is (= [:foo :bar :baz] res))
+        (is (= nil (:count (meta res))))
+        (assert/called-once-with? spy {} "listZones" {:page 1 :pagesize 500}))))
+
+  (let [spy (spy/stub (d/success-deferred [:foo :bar :baz]))]
+    (with-redefs [http/json-request!! spy]
+      (let [res @(http/list-request!! {} "listZones" {})]
+        (is (= [:foo :bar :baz] res))
+        (is (= nil (:count (meta res))))
+        (assert/called-once-with? spy {} "listZones" {:page 1 :pagesize 500}))))
+
+  (let [spy (spy/stub (d/success-deferred (with-meta [:foo :bar :baz] {:count 6})))]
+    (with-redefs [http/json-request!! spy]
+      (let [res @(http/list-request!! {} "listZones" {})]
+        ;; the repetition of results may look bizarre, but it's the responsibility of the service
+        ;;  we are calling, for this test we specify there are 6 items in the `with-meta`
+        ;; count and we recur until we hit that number, the fact the results are repeated is not
+        ;; the concern of clojure-exoscale but of the service we are calling. Our stub returns the
+        ;; same results every time as opposed to the `json-request-spy` example which mimics real pagination
+        (is (= [:foo :bar :baz :foo :bar :baz] res))
+        (is (= 6 (:count (meta res))))
+        (assert/called-n-times? spy 2)
+        (assert/called-with? spy {} "listZones" {:page 1 :pagesize 500})
+        (assert/called-with? spy {} "listZones" {:page 2 :pagesize 500})))))
