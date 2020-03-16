@@ -68,7 +68,7 @@
   (let [list?      (list-command? opcode)
         ks         (set (keys resp))
         payload    (-> resp (dissoc :count) vals first)
-        elem-count (or (:count resp) 0)]
+        elem-count (:count resp)]
     (cond
       (and list? (empty? payload)) (with-meta [] {:count elem-count})
       list?                        (with-meta payload {:count elem-count})
@@ -108,8 +108,10 @@
                                                     :pagesize pagesize))
                (fn [resp]
                  (let [acc (concat acc resp)
-                       all-results-present? (= (:count (meta resp)) (count resp))]
-                   (if (or single-page-only?
+                       meta-count (:count (meta resp))
+                       all-results-present? (= meta-count (count acc))]
+                   (if (or (nil? meta-count)
+                           single-page-only?
                            all-results-present?
                            (not (seq resp)))
                      (with-meta (vec acc) (meta resp))
