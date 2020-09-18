@@ -2,6 +2,7 @@
   "Functions to work with appropriate cloudstack payloads."
   (:require [clojure.string              :as str]
             [exoscale.compute.api.hmac   :as hmac]
+            [exoscale.cloak              :as cloak]
             [exoscale.compute.api.expiry :as expiry]))
 
 (defn stringify
@@ -73,11 +74,11 @@
 (defn build-payload
   "Build a signed payload for a given config, opcode and args triplet"
   ([config opcode params]
-    (build-payload config (assoc params :command opcode)))
-  ([{:keys [api-key api-secret ttl]} params]
-   (let [payload (-> (sanitize-lists params)
+   (build-payload config (assoc params :command opcode)))
+  ([config params]
+   (let [{:keys [api-key api-secret ttl]} (cloak/unmask config)
+         params (cloak/unmask params)
+         payload (-> (sanitize-lists params)
                      (assoc :apiKey api-key :response "json")
                      (merge (expiry/args ttl)))]
-     (assoc payload :signature (sign (query-args payload) api-secret))
-     ;;(sign (query-args payload) api-secret)
-     )))
+     (assoc payload :signature (sign (query-args payload) api-secret)))))

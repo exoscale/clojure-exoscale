@@ -17,5 +17,6 @@
                  [clj-time            "0.15.1"]
                  [aleph               "0.4.6"]
                  [com.jcraft/jsch     "0.1.54"]
-                 [toml                "0.1.3"]]
+                 [toml                "0.1.3"]
+                 [exoscale/cloak      "0.1.0"]]
   :profiles {:dev {:dependencies [[tortue/spy "2.0.0"]]}})
