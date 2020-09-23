@@ -1,6 +1,7 @@
 (ns exoscale.compute.api.spec
   (:require [exoscale.compute.api.http :as http]
-            [clojure.spec.alpha :as spec]))
+            [clojure.spec.alpha :as spec]
+            [exoscale.cloak :as cloak]))
 
 (spec/def ::ne-string
   (spec/and string? (complement clojure.string/blank?)))
@@ -66,8 +67,11 @@
            :name string?
            :vm   :exoscale.compute/vmdef))
 
-(spec/def :exoscale.compute.api.config/api-key ::ne-string)
-(spec/def :exoscale.compute.api.config/api-secret ::ne-string)
+(spec/def ::secret (spec/or :str ::ne-string
+                            :masked ::cloak/secret))
+
+(spec/def :exoscale.compute.api.config/api-key ::secret)
+(spec/def :exoscale.compute.api.config/api-secret ::secret)
 (spec/def :exoscale.compute.api.config/endpoint ::url)
 (spec/def :exoscale.compute.api.config/max-polls int?)
 (spec/def :exoscale.compute.api.config/poll-interval #(>= % http/default-poll-interval))
