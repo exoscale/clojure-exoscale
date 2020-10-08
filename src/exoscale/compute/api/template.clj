@@ -6,7 +6,7 @@
   (:refer-clojure :exclude [update list])
   (:require [exoscale.compute.api.client :as client]
             [exoscale.compute.api.meta   :as meta]
-            [manifold.deferred           :as d])  )
+            [qbits.auspex           :as d])  )
 
 (defn sanitize
   [t]

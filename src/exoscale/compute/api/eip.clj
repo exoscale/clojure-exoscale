@@ -5,8 +5,8 @@
    created here."
   (:refer-clojure :exclude [update list])
   (:require [exoscale.compute.api.client :as client]
-            [manifold.deferred           :as d]
-            [clojure.string :as str]))
+            [qbits.auspex                :as auspex]
+            [clojure.string              :as str]))
 
 
 (defn sanitize
@@ -24,17 +24,17 @@
 (comment
   (defn by-name
     [config eipname]
-    (d/chain (client/api-call config :list-zones {:name (name zname)})
-             (fn [resp]
-               (when-not (= 1 (count resp))
-                 (throw (IllegalArgumentException.
-                         "cannot resolve zone")))
-               (sanitize (first resp))))))
+    (auspex/chain (client/api-call config :list-zones {:name (name zname)})
+                  (fn [resp]
+                    (when-not (= 1 (count resp))
+                      (throw (IllegalArgumentException.
+                              "cannot resolve zone")))
+                    (sanitize (first resp))))))
 
 (defn list
   "List virtual machines"
   [config]
-  (d/chain
+  (auspex/chain
    (client/api-call config :list-public-ip-addresses {:iselastic true})
    #(mapv sanitize %)))
 

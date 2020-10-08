@@ -4,7 +4,7 @@
   (:require [exoscale.compute.api.client :as client]
             [exoscale.compute.api.meta   :as meta]
             [clojure.string              :as str]
-            [manifold.deferred           :as d]))
+            [qbits.auspex                :as auspex]))
 
 (defn sanitize-offering
   [{:keys [authorized cpunumber id memory name displaytext] :as resp}]
@@ -22,18 +22,18 @@
   "The infamous name resolver, using listVirtualMachines since
    Cloudstack does not allow singular get calls"
   [config offering]
-  (d/chain (client/api-call config :list-service-offerings {:name (name offering)})
-           (fn [resp]
-             (when-not (= 1 (count resp))
-               (throw (IllegalArgumentException.
-                       "cannot resolve service offering")))
-             (sanitize-offering (first resp)))))
+  (auspex/chain (client/api-call config :list-service-offerings {:name (name offering)})
+                (fn [resp]
+                  (when-not (= 1 (count resp))
+                    (throw (IllegalArgumentException.
+                            "cannot resolve service offering")))
+                  (sanitize-offering (first resp)))))
 
 (defn list
   "List virtual machines"
   [config]
-  (d/chain (client/api-call config :list-service-offerings)
-           (fn [offerings] (mapv sanitize-offering offerings))))
+  (auspex/chain (client/api-call config :list-service-offerings)
+                (fn [offerings] (mapv sanitize-offering offerings))))
 
 (comment
 

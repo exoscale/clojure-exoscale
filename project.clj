@@ -16,6 +16,8 @@
                  [cheshire            "5.8.1"]
                  [clj-time            "0.15.1"]
                  [aleph               "0.4.6"]
+                 [cc.qbits/auspex     "0.1.0-alpha3"]
+                 [exoscale/net-http   "0.1.0-SNAPSHOT"]
                  [com.jcraft/jsch     "0.1.54"]
                  [toml                "0.1.3"]
                  [exoscale/cloak      "0.1.1"]]

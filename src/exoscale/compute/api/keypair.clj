@@ -6,7 +6,7 @@
   (:refer-clojure :exclude [list])
   (:require [exoscale.compute.api.client :as client]
             [exoscale.compute.api.meta   :as meta]
-            [manifold.deferred           :as d]))
+            [qbits.auspex                :as auspex]))
 
 (defonce keystore
   (atom {}))
@@ -19,33 +19,33 @@
   "The infamous name resolver, using listVirtualMachines since
    Cloudstack does not allow singular get calls"
   [config kp]
-  (d/chain (client/api-call config :list-ssh-key-pairs {:name (name kp)})
-           (fn [resp]
-             (when-not (= 1 (count resp))
-               (throw (IllegalArgumentException.
-                       "cannot resolve service offering")))
-             (sanitize
-              (first resp)))))
+  (auspex/chain (client/api-call config :list-ssh-key-pairs {:name (name kp)})
+                (fn [resp]
+                  (when-not (= 1 (count resp))
+                    (throw (IllegalArgumentException.
+                            "cannot resolve service offering")))
+                  (sanitize
+                   (first resp)))))
 
 (defn list
   "List virtual machines"
   [config]
-  (d/chain (client/api-call config :list-ssh-key-pairs)
-           #(mapv sanitize %)))
+  (auspex/chain (client/api-call config :list-ssh-key-pairs)
+                #(mapv sanitize %)))
 
 (defn register
   [config kpname public-key]
-  (d/chain   (client/api-call config "registerSSHKeyPair"
-                              {:name      (name kpname)
-                               :publickey public-key})
-             :keypair
-             sanitize))
+  (auspex/chain   (client/api-call config "registerSSHKeyPair"
+                                   {:name      (name kpname)
+                                    :publickey public-key})
+                  :keypair
+                  sanitize))
 
 (defn create
   [config kpname]
-  (d/chain (client/api-call config "createSSHKeyPair" {:name (name kpname)})
-           :keypair
-           sanitize))
+  (auspex/chain (client/api-call config "createSSHKeyPair" {:name (name kpname)})
+                :keypair
+                sanitize))
 
 (defn flush-private-keys
   []
@@ -58,7 +58,7 @@
 
 (defn create-and-store
   [config kpname]
-  (d/chain (create config kpname) store-private-key))
+  (auspex/chain (create config kpname) store-private-key))
 
 (defn private-key
   [kpname]
