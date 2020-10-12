@@ -1,13 +1,12 @@
 (ns exoscale.compute.api.http
   "HTTP support for the Exoscale Compute API"
   (:require [clojure.string               :as str]
-            [byte-streams                 :as bs]
             [cheshire.core                :as json]
-            [manifold.time                :as t]
             [exoscale.compute.api.payload :as payload]
             [exoscale.net.http.client     :as client]
             [qbits.auspex                 :as auspex]
-            [clojure.java.io :as io]))
+            [clojure.java.io :as io])
+  (:import (java.io InputStream)))
 
 (def default-client (delay (client/client {})))
 
@@ -43,7 +42,10 @@
       (let [d (ex-data e)]
         (throw (if-let [body (:body d)]
                  (ex-info (ex-message e)
-                          (assoc d :body (bs/to-string body))
+                          (assoc d :body
+                                 (cond-> body
+                                   (instance? InputStream body)
+                                   slurp))
                           (ex-cause e))
                  e))))))
 
@@ -53,7 +55,7 @@
      (-> opcode name (str/starts-with? "list")))))
 
 (defn raw-request!!
-  "Send an HTTP request with manifold"
+  "Send an HTTP request"
   [{:keys [endpoint http-opts client method]
     :or {method :get}
     :as config} payload]
@@ -65,8 +67,7 @@
                                  paramk payload
                                  :method method}
                           (= :post method)
-                          (assoc-in [:headers "Content-Type"]
-                                    "x-www-form-urlencoded")))
+                          (assoc :headers {:content-type "application/x-www-form-urlencoded"})))
         (auspex/chain (fn [response]
                         (update response
                                 :body
@@ -138,7 +139,9 @@
   (let [interval (or (:poll-interval config) default-poll-interval)]
     (fn [{:keys [jobstatus] :as job}]
       (if (zero? jobstatus)
-        (auspex/chain (t/in interval (constantly nil))
+        (auspex/chain (auspex/timeout! (auspex/future)
+                                       interval
+                                       ::timeout)
                       (fn [_] (auspex/recur (dec remaining))))
         (find-payload (:jobresult job) opcode)))))
 

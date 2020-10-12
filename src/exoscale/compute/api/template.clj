@@ -6,7 +6,7 @@
   (:refer-clojure :exclude [update list])
   (:require [exoscale.compute.api.client :as client]
             [exoscale.compute.api.meta   :as meta]
-            [qbits.auspex           :as d])  )
+            [qbits.auspex                :as auspex]))
 
 (defn sanitize
   [t]
@@ -17,34 +17,34 @@
 
 (defn by-zone-name
   [config zid tname]
-  (d/chain (client/api-call config :list-templates {:name           tname
-                                                    :templatefilter "featured"
-                                                    :zoneid         (str zid)})
-           (fn [resp]
-             (when (empty? resp)
-               (throw (ex-info "could not find any template to satisfy criteria"
-                               {:zoneid zid
-                                :name   tname})))
-             (-> (sort-by :created resp) (last) (sanitize)))))
+  (auspex/chain (client/api-call config :list-templates {:name           tname
+                                                         :templatefilter "featured"
+                                                         :zoneid         (str zid)})
+                (fn [resp]
+                  (when (empty? resp)
+                    (throw (ex-info "could not find any template to satisfy criteria"
+                                    {:zoneid zid
+                                     :name   tname})))
+                  (-> (sort-by :created resp) (last) (sanitize)))))
 
 (defn by-zone-id
   [config zid tid]
-  (d/chain (client/api-call config :list-templates {:id             (str tid)
-                                                    :zoneid         (str zid)
-                                                    :templatefilter "featured"})
-           (fn [resp]
-             (when (not= 1 (count resp))
-               (throw (ex-info "could not find any template to satisfy criteria"
-                               {:id     tid
-                                :zoneid zid
-                                :resp   resp})))
-             (sanitize (first resp)))))
+  (auspex/chain (client/api-call config :list-templates {:id             (str tid)
+                                                         :zoneid         (str zid)
+                                                         :templatefilter "featured"})
+                (fn [resp]
+                  (when (not= 1 (count resp))
+                    (throw (ex-info "could not find any template to satisfy criteria"
+                                    {:id     tid
+                                     :zoneid zid
+                                     :resp   resp})))
+                  (sanitize (first resp)))))
 
 (defn list
   "List virtual machines"
   [config]
-  (d/chain (client/api-call config :list-templates {:templatefilter "featured"})
-           #(mapv sanitize %)))
+  (auspex/chain (client/api-call config :list-templates {:templatefilter "featured"})
+                #(mapv sanitize %)))
 
 (comment
 

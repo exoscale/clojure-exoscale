@@ -1,6 +1,5 @@
 (ns exoscale.compute.api.http-test
   (:require [clojure.test :refer [deftest testing is]]
-            [manifold.deferred :as d]
             [qbits.auspex :as auspex]
             [exoscale.compute.api.http :as http]
             [spy.core :as spy]
