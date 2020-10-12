@@ -1,11 +1,11 @@
 (ns exoscale.compute.api.http
   "HTTP support for the Exoscale Compute API"
-  (:require [clojure.string               :as str]
-            [cheshire.core                :as json]
+  (:require [cheshire.core                :as json]
+            [clojure.java.io :as io]
+            [clojure.string               :as str]
             [exoscale.compute.api.payload :as payload]
             [exoscale.net.http.client     :as client]
-            [qbits.auspex                 :as auspex]
-            [clojure.java.io :as io])
+            [qbits.auspex                 :as auspex])
   (:import (java.io InputStream)))
 
 (def default-client (delay (client/client {})))
@@ -54,6 +54,20 @@
    (fn [opcode]
      (-> opcode name (str/starts-with? "list")))))
 
+(defn opts->http-client-opts
+  "Converts client opts to jdk11 client opts"
+  [{:as _opts :keys [connection-timeout]}]
+  (cond-> {}
+    connection-timeout
+    (assoc :exoscale.net.http.client.option/connect-timeout connection-timeout)))
+
+(defn opts->http-request-opts
+  "Converts request opts to jdk11 client opts"
+  [{:as _opts :keys [request-timeout]}]
+  (cond-> {}
+    request-timeout
+    (assoc :exoscale.net.http.client.request/timeout request-timeout)))
+
 (defn raw-request!!
   "Send an HTTP request"
   [{:keys [endpoint http-opts client method]
@@ -63,11 +77,12 @@
         method (some-> method name str/lower-case keyword)
         paramk (if (= :get method) :query-params :form-params)]
     (-> (client/request (or client @default-client)
-                        (cond-> {:url (or endpoint default-endpoint)
-                                 paramk payload
-                                 :method method}
-                          (= :post method)
-                          (assoc :headers {:content-type "application/x-www-form-urlencoded"})))
+                        (-> (cond-> {:url (or endpoint default-endpoint)
+                                     paramk payload
+                                     :method method}
+                              (= :post method)
+                              (assoc :headers {:content-type "application/x-www-form-urlencoded"}))
+                            opts->http-request-opts))
         (auspex/chain (fn [response]
                         (update response
                                 :body
