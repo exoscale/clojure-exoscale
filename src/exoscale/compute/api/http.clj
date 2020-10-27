@@ -59,7 +59,7 @@
   [{:as _opts :keys [connection-timeout]}]
   (cond-> {}
     connection-timeout
-    (assoc :exoscale.net.http.client.option/connect-timeout connection-timeout)))
+    (assoc :exoscale.net.http.client/connect-timeout connection-timeout)))
 
 (defn opts->http-request-opts
   "Converts request opts to jdk11 client opts"
