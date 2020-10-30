@@ -8,7 +8,8 @@
             [qbits.auspex                 :as auspex])
   (:import (java.io InputStream)))
 
-(def default-client (delay (client/client {})))
+(def default-client
+  (delay (client/client #:exoscale.net.http.client{:connect-timeout 10000})))
 
 (def default-page-size
   "Number of records to fetch by default"
@@ -28,10 +29,7 @@
 
 (def default-http-opts
   "Default HTTP options passed to the underlying HTTP library (aleph)."
-  {:connection-timeout 10000
-   :request-timeout    10000
-   :pool-timeout       1000
-   :read-timeout       10000})
+  {:request-timeout 10000})
 
 (defn with-decoded-error-body
   "Catches potential deferred error and rethrow with decoded
@@ -54,15 +52,8 @@
    (fn [opcode]
      (-> opcode name (str/starts-with? "list")))))
 
-(defn opts->http-client-opts
-  "Converts client opts to jdk11 client opts"
-  [{:as _opts :keys [connection-timeout]}]
-  (cond-> {}
-    connection-timeout
-    (assoc :exoscale.net.http.client/connect-timeout connection-timeout)))
-
 (defn opts->http-request-opts
-  "Converts request opts to jdk11 client opts"
+  "Converts legacy request opts to jdk11 client opts"
   [{:as _opts :keys [request-timeout]}]
   (cond-> {}
     request-timeout
@@ -72,17 +63,17 @@
   "Send an HTTP request"
   [{:keys [endpoint http-opts client method]
     :or {method :get}
-    :as config} payload]
+    :as _config} payload]
   (let [opts   (merge default-http-opts http-opts {:as :json})
         method (some-> method name str/lower-case keyword)
         paramk (if (= :get method) :query-params :form-params)]
     (-> (client/request (or client @default-client)
-                        (-> (cond-> {:url (or endpoint default-endpoint)
-                                     paramk payload
-                                     :method method}
-                              (= :post method)
-                              (assoc :headers {:content-type "application/x-www-form-urlencoded"}))
-                            opts->http-request-opts))
+                        (cond-> (assoc (opts->http-request-opts opts)
+                                       :url (or endpoint default-endpoint)
+                                       paramk payload
+                                       :method method)
+                          (= :post method)
+                          (assoc :headers {:content-type "application/x-www-form-urlencoded"})))
         (auspex/chain (fn [response]
                         (update response
                                 :body
