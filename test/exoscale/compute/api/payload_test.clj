@@ -1,14 +1,15 @@
 (ns exoscale.compute.api.payload-test
   (:require [exoscale.compute.api.payload :refer [build-payload]]
+            [exoscale.compute.api.expiry :as exp]
             [clojure.test :refer :all]
-            [exoscale.cloak :as cloak]
-            [clj-time.core :as t]))
+            [exoscale.cloak :as cloak])
+  (:import (java.time Instant)))
 
 (def API_KEY "key")
 (def API_SECRET "secret")
 
 (deftest test-payload
-  (with-redefs [t/now (constantly (t/date-time 2019))]
+  (with-redefs [exp/now (constantly (Instant/ofEpochMilli 1546300800000))]
     (let [payload (build-payload
                    {:api-key API_KEY
                     :api-secret API_SECRET

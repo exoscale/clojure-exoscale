@@ -1,11 +1,12 @@
 (ns exoscale.compute.api.expiry
   "Date manipulation functions."
-  (:require [clj-time.format :refer [parse unparse formatter formatters]]
-            [clj-time.core   :refer [seconds plus now after?]]))
+  (:import (java.time.format DateTimeFormatter)
+           (java.time Instant ZoneOffset)))
 
 (def cloudstack-format
   "Date format used by Cloudstack"
-  (formatter "yyyy-MM-dd'T'HH:mm:ssZ"))
+  (-> (DateTimeFormatter/ofPattern "yyyy-MM-dd'T'HH:mm:ssZ")
+      (.withZone ZoneOffset/UTC)))
 
 (def default-ttl
   "Default to 5 minute expiry"
@@ -16,9 +17,14 @@
   {:signatureVersion "3"})
 
 (defn limit
-  "Compute date of request validity expiry"
-  [from ttl]
-  (unparse cloudstack-format (plus from (seconds ttl))))
+  "Compute date of request validity expiry."
+  [^Instant from ttl-seconds]
+  (.format cloudstack-format
+           (.plusSeconds from (long ttl-seconds))))
+
+(defn now
+  []
+  (Instant/now))
 
 (defn args
   "Builds the expires argument map. Expiration is in seconds.
