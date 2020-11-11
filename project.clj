@@ -14,7 +14,7 @@
 
   :dependencies [[org.clojure/clojure "1.10.1"]
                  [cheshire            "5.8.1"]
-                 [exoscale/net-http   "0.1.0-alpha5"]
+                 [exoscale/telex   "0.1.0-alpha6"]
                  [com.jcraft/jsch     "0.1.54"]
                  [toml                "0.1.3"]
                  [exoscale/cloak      "0.1.3"]]

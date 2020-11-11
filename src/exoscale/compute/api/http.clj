@@ -4,12 +4,12 @@
             [clojure.java.io :as io]
             [clojure.string               :as str]
             [exoscale.compute.api.payload :as payload]
-            [exoscale.net.http.client     :as client]
+            [exoscale.net.telex           :as client]
             [qbits.auspex                 :as auspex])
   (:import (java.io InputStream)))
 
 (def default-client
-  (delay (client/client #:exoscale.net.http.client{:connect-timeout 10000})))
+  (delay (client/client #:exoscale.telex.client{:connect-timeout 10000})))
 
 (def default-page-size
   "Number of records to fetch by default"
@@ -57,7 +57,7 @@
   [{:as _opts :keys [request-timeout]}]
   (cond-> {}
     request-timeout
-    (assoc :exoscale.net.http.client.request/timeout request-timeout)))
+    (assoc :exoscale.net.telex.request/timeout request-timeout)))
 
 (defn raw-request!!
   "Send an HTTP request"
