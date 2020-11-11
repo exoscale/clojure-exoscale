@@ -4,7 +4,7 @@
             [clojure.java.io :as io]
             [clojure.string               :as str]
             [exoscale.compute.api.payload :as payload]
-            [exoscale.net.telex           :as client]
+            [exoscale.telex               :as client]
             [qbits.auspex                 :as auspex])
   (:import (java.io InputStream)))
 
@@ -57,7 +57,7 @@
   [{:as _opts :keys [request-timeout]}]
   (cond-> {}
     request-timeout
-    (assoc :exoscale.net.telex.request/timeout request-timeout)))
+    (assoc :exoscale.telex.request/timeout request-timeout)))
 
 (defn raw-request!!
   "Send an HTTP request"
