@@ -1,6 +1,6 @@
 (ns exoscale.compute.api.http-test
   (:require [clojure.test :refer [deftest testing is]]
-            [manifold.deferred :as d]
+            [qbits.auspex :as auspex]
             [exoscale.compute.api.http :as http]
             [spy.core :as spy]
             [spy.assert :as assert]))
@@ -31,12 +31,12 @@
 
 (defn json-request-spy [items]
   (spy/spy (fn [config opcode {:keys [page pagesize]}]
-             (d/success-deferred (with-meta (->> items
-                                                 (drop (* (dec page) pagesize))
-                                                 (take pagesize)
-                                                 (map (fn [n]
-                                                        {:item n})))
-                                   {:count (count items)})))))
+             (auspex/success-future (with-meta (->> items
+                                                    (drop (* (dec page) pagesize))
+                                                    (take pagesize)
+                                                    (map (fn [n]
+                                                           {:item n})))
+                                      {:count (count items)})))))
 
 (deftest pagination-no-params-test
   (let [spy (json-request-spy (range 0 5))]
@@ -82,21 +82,21 @@
         (assert/called-with? spy {} "listZones" {:page 2 :pagesize 500})))))
 
 (deftest do-not-recur-if-count-missing-test
-  (let [spy (spy/stub (d/success-deferred (with-meta [:foo :bar :baz] {:count nil})))]
+  (let [spy (spy/stub (auspex/success-future (with-meta [:foo :bar :baz] {:count nil})))]
     (with-redefs [http/json-request!! spy]
       (let [res @(http/list-request!! {} "listZones" {})]
         (is (= [:foo :bar :baz] res))
         (is (= nil (:count (meta res))))
         (assert/called-once-with? spy {} "listZones" {:page 1 :pagesize 500}))))
 
-  (let [spy (spy/stub (d/success-deferred [:foo :bar :baz]))]
+  (let [spy (spy/stub (auspex/success-future [:foo :bar :baz]))]
     (with-redefs [http/json-request!! spy]
       (let [res @(http/list-request!! {} "listZones" {})]
         (is (= [:foo :bar :baz] res))
         (is (= nil (:count (meta res))))
         (assert/called-once-with? spy {} "listZones" {:page 1 :pagesize 500}))))
 
-  (let [spy (spy/stub (d/success-deferred (with-meta [:foo :bar :baz] {:count 6})))]
+  (let [spy (spy/stub (auspex/success-future (with-meta [:foo :bar :baz] {:count 6})))]
     (with-redefs [http/json-request!! spy]
       (let [res @(http/list-request!! {} "listZones" {})]
         ;; the repetition of results may look bizarre, but it's the responsibility of the service

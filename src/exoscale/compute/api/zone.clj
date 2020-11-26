@@ -6,7 +6,7 @@
   (:refer-clojure :exclude [list])
   (:require [exoscale.compute.api.client :as client]
             [exoscale.compute.api.meta   :as meta]
-            [manifold.deferred           :as d]
+            [qbits.auspex                :as auspex]
             [exoscale.compute.api.spec]))
 
 (defn sanitize
@@ -18,18 +18,18 @@
 
 (defn by-name
   [config zname]
-  (d/chain (client/api-call config :list-zones {:name (name zname)})
-           (fn [resp]
-             (when-not (= 1 (count resp))
-               (throw (IllegalArgumentException.
-                       "cannot resolve zone")))
-             (sanitize (first resp)))))
+  (auspex/chain (client/api-call config :list-zones {:name (name zname)})
+                (fn [resp]
+                  (when-not (= 1 (count resp))
+                    (throw (IllegalArgumentException.
+                            "cannot resolve zone")))
+                  (sanitize (first resp)))))
 
 (defn list
   "List virtual machines"
   [config]
-  (d/chain (client/api-call config :list-zones)
-           #(mapv sanitize %)))
+  (auspex/chain (client/api-call config :list-zones)
+                #(mapv sanitize %)))
 
 (comment
 

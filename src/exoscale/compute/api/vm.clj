@@ -8,7 +8,7 @@
             [exoscale.compute.api.keypair  :as keypair]
             [exoscale.compute.api.meta     :as meta]
             [exoscale.compute.ssh          :as ssh]
-            [manifold.deferred             :as d]
+            [qbits.auspex                  :as auspex]
             [clojure.string                :as str]
             [clojure.spec.alpha            :as spec]
             [exoscale.compute.api.spec]))
@@ -92,12 +92,12 @@
   "The infamous name resolver, using listVirtualMachines since
    Cloudstack does not allow singular get calls"
   [config vm]
-  (d/chain (client/api-call config :list-virtual-machines {:name (name vm)})
-           (fn [resp]
-             (when-not (= 1 (count resp))
-               (throw (IllegalArgumentException.
-                       "cannot resolve virtual machine name")))
-             (sanitize-vm (first resp)))))
+  (auspex/chain (client/api-call config :list-virtual-machines {:name (name vm)})
+                (fn [resp]
+                  (when-not (= 1 (count resp))
+                    (throw (IllegalArgumentException.
+                            "cannot resolve virtual machine name")))
+                  (sanitize-vm (first resp)))))
 
 (defn vmdef?
   "Predicate to test against a valid VM definition"
@@ -109,8 +109,8 @@
   [config target]
   (cond
     (uuid? target)    (str target)
-    (keyword? target) (d/chain (by-name config target) :id str)
-    (string? target)  (d/chain (by-name config target) :id str)
+    (keyword? target) (auspex/chain (by-name config target) :id str)
+    (string? target)  (auspex/chain (by-name config target) :id str)
     (vmdef? target)   (str (:id target))
     :else             (throw (IllegalArgumentException.
                               "invalid argument to resolve-id"))))
@@ -120,7 +120,7 @@
   [action config target params]
   (let [opcode  (str (name action) "VirtualMachine")
         call-fn #(client/api-call config opcode (merge params {:id %}))]
-    (d/chain (resolve-id config target)
+    (auspex/chain (resolve-id config target)
              call-fn
              sanitize-vm)))
 
@@ -142,83 +142,83 @@
 (defn get-password
   "Fetch encrypted password"
   [config target]
-  (d/chain (resolve-id config target)
-           #(client/api-call config :get-vm-password {:id %})
-           :password
-           :encryptedpassword))
+  (auspex/chain (resolve-id config target)
+                #(client/api-call config :get-vm-password {:id %})
+                :password
+                :encryptedpassword))
 
 (defn list
   "List virtual machines"
   [config & [params]]
-  (d/chain (client/api-call config :list-virtual-machines params)
-           (fn [vms] (mapv sanitize-vm vms))))
+  (auspex/chain (client/api-call config :list-virtual-machines params)
+                (fn [vms] (mapv sanitize-vm vms))))
 
 (defn resolve-indirect-params
   ""
   [config {:keys [zoneid zone serviceoffering template]}]
-  (d/let-flow [zid (or zoneid (d/chain (zone/by-name config zone) :id))
-               sid (when (some? serviceoffering)
-                     (d/chain (offering/by-name config serviceoffering) :id))
-               tid (when (some? template)
-                     (d/chain (template/by-zone-name config zid template) :id))]
-    (cond-> {}
-      (some? zone) (assoc :zoneid zid)
-      (some? serviceoffering) (assoc :serviceofferingid sid)
-      (some? template) (assoc :templateid tid))))
+  (auspex/let-flow [zid (or zoneid (auspex/chain (zone/by-name config zone) :id))
+                    sid (when (some? serviceoffering)
+                          (auspex/chain (offering/by-name config serviceoffering) :id))
+                    tid (when (some? template)
+                          (auspex/chain (template/by-zone-name config zid template) :id))]
+                   (cond-> {}
+                     (some? zone) (assoc :zoneid zid)
+                     (some? serviceoffering) (assoc :serviceofferingid sid)
+                     (some? template) (assoc :templateid tid))))
 
 (defn deploy
   "Deploy virtual machine"
   [config params]
   {:pre [(spec/valid? :exoscale.compute/vm params)]}
-  (d/chain (resolve-indirect-params config params)
-           (fn [resolved] (merge resolved (dissoc params :zone :template :serviceoffering)))
-           (fn [params] (client/api-call config :deploy-virtual-machine params))
-           sanitize-vm))
+  (auspex/chain (resolve-indirect-params config params)
+                (fn [resolved] (merge resolved (dissoc params :zone :template :serviceoffering)))
+                (fn [params] (client/api-call config :deploy-virtual-machine params))
+                sanitize-vm))
 
 (defn destroy
   "Destroy virtual machine"
   [config target]
-  (d/chain (resolve-id config target)
-           #(client/api-call config :destroy-virtual-machine {:id %})
-           (constantly nil)))
+  (auspex/chain (resolve-id config target)
+                #(client/api-call config :destroy-virtual-machine {:id %})
+                (constantly nil)))
 
 (defn ssh
   "Asynchronously reach out to a machine to execute an ssh command"
   [config target command]
-  (d/let-flow [vm (if (vmdef? target) target (by-name config target))
-               template (template/by-zone-id config
-                                             (meta/zone vm)
-                                             (get-in vm [:template :id]))]
-    (let [pkey (keypair/private-key (:keypair vm))
-          user (or (get-in template [:details :username]) "root")
-          host (get-in vm [:public :ipv4 :ip])]
-      (when (nil? pkey)
-        (throw (ex-info (str "cannot find private key named: " (:keypair vm))
-                        {:vm vm})))
-      (when (nil? host)
-        (throw (ex-info "cannot find host address" {:vm vm})))
-      (d/future
-        (ssh/exec pkey host command {:user user})))))
+  (auspex/let-flow [vm (if (vmdef? target) target (by-name config target))
+                    template (template/by-zone-id config
+                                                  (meta/zone vm)
+                                                  (get-in vm [:template :id]))]
+                   (let [pkey (keypair/private-key (:keypair vm))
+                         user (or (get-in template [:details :username]) "root")
+                         host (get-in vm [:public :ipv4 :ip])]
+                     (when (nil? pkey)
+                       (throw (ex-info (str "cannot find private key named: " (:keypair vm))
+                                       {:vm vm})))
+                     (when (nil? host)
+                       (throw (ex-info "cannot find host address" {:vm vm})))
+                     (auspex/future
+                       (ssh/exec pkey host command {:user user})))))
 
 (defn ensure-up
   "Wait for machine to be up by probbing the SSH port. This assumes that
    inbound SSH is authorized"
   [config target timeout]
-  (d/let-flow [vm       (if (vmdef? target) target (by-name config target))
-               template (template/by-zone-id config
-                                             (meta/zone vm)
-                                             (get-in vm [:template :id]))]
-    (let [pkey (keypair/private-key (:keypair vm))
-          user (or (get-in template [:details :username]) "root")
-          host (get-in vm [:public :ipv4 :ip])]
-      (when (nil? pkey)
-        (throw (ex-info (str "cannot find private key named: " (:keypair vm))
-                        {:vm vm})))
-      (when (nil? host)
-        (throw (ex-info "cannot find host address" {:vm vm})))
-      (d/chain
-       (d/future (ssh/ensure-up pkey host timeout {:user user}))
-       (constantly vm)))))
+  (auspex/let-flow [vm       (if (vmdef? target) target (by-name config target))
+                    template (template/by-zone-id config
+                                                  (meta/zone vm)
+                                                  (get-in vm [:template :id]))]
+                   (let [pkey (keypair/private-key (:keypair vm))
+                         user (or (get-in template [:details :username]) "root")
+                         host (get-in vm [:public :ipv4 :ip])]
+                     (when (nil? pkey)
+                       (throw (ex-info (str "cannot find private key named: " (:keypair vm))
+                                       {:vm vm})))
+                     (when (nil? host)
+                       (throw (ex-info "cannot find host address" {:vm vm})))
+                     (auspex/chain
+                      (auspex/future (ssh/ensure-up pkey host timeout {:user user}))
+                      (constantly vm)))))
 
 
 
@@ -229,15 +229,15 @@
 
   (do
     @(keypair/create-and-store config :auto)
-    @(d/chain  (deploy config
-                       {:name            "clojure01"
-                        :displayname     "Clojure Test Box"
-                        :zone            "at-vie-1"
-                        :template        "Linux Debian 9 64-bit"
-                        :keypair         "auto"
-                        :serviceoffering "micro"})
-               #(ensure-up config % 40)
-               #(ssh config % "echo hello")))
+    @(auspex/chain  (deploy config
+                            {:name            "clojure01"
+                             :displayname     "Clojure Test Box"
+                             :zone            "at-vie-1"
+                             :template        "Linux Debian 9 64-bit"
+                             :keypair         "auto"
+                             :serviceoffering "micro"})
+                    #(ensure-up config % 40)
+                    #(ssh config % "echo hello")))
   @(ensure-up :clojure01)
   @(ssh config :clojure01 "echo hello")
 
@@ -248,6 +248,6 @@
 
   @(ssh config :clojure01 "echo hello")
   @(stop config :clojure01)
-  
+
   @(destroy config :clojure01)
   )
