@@ -14,7 +14,7 @@
 (defn url-encode
   "Encode URL"
   [s]
-  (java.net.URLEncoder/encode s "UTF-8"))
+  (java.net.URLEncoder/encode (str s) "UTF-8"))
 
 (defn quote-plus
   "Replace + in encoded URL by %20"
