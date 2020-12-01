@@ -13,9 +13,9 @@
                         ["snapshots" :clojars]]
 
   :dependencies [[org.clojure/clojure "1.10.1"]
-                 [cheshire            "5.8.1"]
+                 [cheshire            "5.10.0"]
                  [exoscale/telex      "0.1.0-alpha7"]
-                 [com.jcraft/jsch     "0.1.54"]
+                 [com.jcraft/jsch     "0.1.55"]
                  [toml                "0.1.3"]
                  [exoscale/cloak      "0.1.3"]]
-  :profiles {:dev {:dependencies [[tortue/spy "2.0.0"]]}})
+  :profiles {:dev {:dependencies [[tortue/spy "2.4.0"]]}})
