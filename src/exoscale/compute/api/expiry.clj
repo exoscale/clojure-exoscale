@@ -3,7 +3,7 @@
   (:import (java.time.format DateTimeFormatter)
            (java.time Instant ZoneOffset)))
 
-(def cloudstack-format
+(def ^DateTimeFormatter cloudstack-format
   "Date format used by Cloudstack"
   (-> (DateTimeFormatter/ofPattern "yyyy-MM-dd'T'HH:mm:ssZ")
       (.withZone ZoneOffset/UTC)))
