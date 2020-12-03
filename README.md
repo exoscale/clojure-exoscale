@@ -6,7 +6,7 @@ Documentation at https://exoscale.github.io/clojure-exoscale
 
 ## Breaking changes
 
-* Starting from `1.0.0-alpha1` we no longer rely on manifold/aleph, we
+* Starting from `0.2.0` we no longer rely on manifold/aleph, we
   instead use the http client from jdk11, which returns
   CompletableFutures.
 
