@@ -164,10 +164,23 @@
           resp))
       resp)))
 
+(defn validate-job!!
+  [config opcode params]
+  (fn [{:keys [errortext errorcode] :as jobresult}]
+    (when (and (:throw-on-job-failure? config)
+               (some? errortext))
+      (throw (ex-info "Job failed"
+                      {:status errorcode
+                       :body errortext
+                       :command opcode
+                       :params params})))
+    jobresult))
+
 (defn job-request!!
   [config opcode params]
   (auspex/chain (json-request!! config opcode params)
-                (job-loop!! config opcode)))
+                (job-loop!! config opcode)
+                (validate-job!! config opcode params)))
 
 (defn request!!
   "Send a request to the API and figure out the best course of action

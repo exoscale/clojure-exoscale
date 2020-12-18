@@ -109,3 +109,21 @@
         (assert/called-n-times? spy 2)
         (assert/called-with? spy {} "listZones" {:page 1 :pagesize 500})
         (assert/called-with? spy {} "listZones" {:page 2 :pagesize 500})))))
+
+(deftest throw-on-job-failure-when-configured
+  (let [jobid (java.util.UUID/randomUUID)
+        jobresult {:errortext "Failed to delete snapshot:com.cloud.exception.InvalidParameterValueException: Can't delete snapshot 75136 with status BackingUp"
+                   :errorcode 530}]
+    (with-redefs [http/json-request!! (fn [_ _ _]
+                                        (constantly (auspex/success-future {:deletesnapshotresponse {:jobid jobid}})))
+                  http/job-loop!! (fn [_ _]
+                                    (constantly (auspex/success-future jobresult)))]
+      (try
+        (auspex/unwrap (http/job-request!! {:throw-on-job-failure? true} "deleteSnapshot" {}))
+        (is false "call should have failed")
+        (catch Exception e
+          (is (= (:errorcode jobresult)
+                 (:status (ex-data e))))))
+
+      (is (= jobresult
+             @(http/job-request!! {} "deleteSnapshot" {}))))))
