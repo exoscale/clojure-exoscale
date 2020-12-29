@@ -2,6 +2,7 @@
   (:require [clojure.test :refer [deftest testing is]]
             [qbits.auspex :as auspex]
             [exoscale.compute.api.http :as http]
+            [exoscale.compute.api.utils-test :as utils]
             [spy.core :as spy]
             [spy.assert :as assert]))
 
@@ -127,3 +128,68 @@
 
       (is (= jobresult
              @(http/job-request!! {} "deleteSnapshot" {}))))))
+
+
+(defn rand-uuid [] (java.util.UUID/randomUUID))
+
+(deftest throw-on-job-failure-when-configured-v2
+  (let [job-id (rand-uuid)
+        job-result {:errortext "Failed to delete snapshot:com.cloud.exception.InvalidParameterValueException: Can't delete snapshot 75136 with status BackingUp"
+                    :errorcode 530}]
+    (utils/with-http 8080 {:deleteSnapshot       (constantly {:status 200
+                                                              :body {:deletesnapshotresponse
+                                                                     {:jobid job-id}}})
+                           :queryAsyncJobResult (constantly {:status 200
+                                                             :body {:queryasyncjobresultresponse
+                                                                    {:cmd "org.apache.cloudstack.api.command.user.snapshot.DeleteSnapshotCmd"
+                                                                     :jobid  job-id
+                                                                     :jobstatus 2
+                                                                     :jobresult job-result}}})}
+      (try
+        (auspex/unwrap (http/request!! {:endpoint "http://localhost:8080"
+                                        :api-key "foo"
+                                        :api-secret "bar"
+                                        :throw-on-job-failure? true}
+                                       "deleteSnapshot"
+                                       {:id (rand-uuid)}))
+        (is false "call should have failed")
+        (catch Exception e
+          (is (= (:errorcode job-result)
+                 (:status (ex-data e))))))
+      (is (= job-result
+             (auspex/unwrap (http/request!! {:endpoint "http://localhost:8080"
+                                             :api-key "foo"
+                                             :api-secret "bar"}
+                                            "deleteSnapshot"
+                                            {:id (rand-uuid)})))))))
+
+(deftest listing-commands
+  (let [template-id (rand-uuid)
+        error       (format "Unable to execute API command listtemplates due to invalid value. entity %s does not exist." template-id)]
+    (utils/with-http 8080 {:listVirtualMachines  (constantly {:status 200
+                                                              :body {:listvirtualmachinesresponse
+                                                                     {:count 0
+                                                                      :virtualmachine []}}})
+
+                           :listTemplates (constantly {:status 431
+                                                       :body {:listtemplatesresponse
+                                                              {:cserrorcode 9999
+                                                               :errorcode 431
+                                                               :errortext error}}})}
+      (is (= []
+             (auspex/unwrap (http/request!! {:endpoint "http://localhost:8080"
+                                             :api-key "foo"
+                                             :api-secret "bar"}
+                                            "listVirtualMachines"
+                                            {}))))
+      (try
+        (auspex/unwrap (http/request!! {:endpoint "http://localhost:8080"
+                                        :api-key "foo"
+                                        :api-secret "bar"}
+                                       "listTemplates"
+                                       {:id template-id}))
+        (is false "call should have failed")
+        (catch Exception e
+          (is (= {:status 431
+                  :body (format "")}
+                 (select-keys (ex-data e) [:status :body]))))))))
