@@ -141,7 +141,7 @@
                           (auspex/recur (inc page) acc))))))))
 
 (defn wait-or-return-job!!
-  [config remaining opcode]
+  [config remaining]
   (let [interval (or (:poll-interval config) default-poll-interval)]
     (fn [{:keys [jobstatus] :as job}]
       (if (zero? jobstatus)
@@ -149,10 +149,10 @@
                                        interval
                                        ::timeout)
                       (fn [_] (auspex/recur (dec remaining))))
-        (find-payload (:jobresult job) opcode)))))
+        job))))
 
 (defn job-loop!!
-  [config opcode]
+  [config]
   (fn [{:keys [jobid] :as resp}]
     (if (some? jobid)
       (auspex/loop [remaining (or (:max-polls config) default-max-polls)]
@@ -160,26 +160,27 @@
           ;; The previous response can be used as input
           ;; to queryAsyncJobResult directly
           (auspex/chain (json-request!! config "queryAsyncJobResult" {:jobid jobid})
-                        (wait-or-return-job!! config remaining opcode))
+                        (wait-or-return-job!! config remaining))
           resp))
       resp)))
 
 (defn validate-job!!
   [config opcode params]
-  (fn [{:keys [errortext errorcode] :as jobresult}]
+  (fn [{{:keys [errortext errorcode] :as jobresult} :jobresult :as response}]
     (when (and (:throw-on-job-failure? config)
                (some? errortext))
       (throw (ex-info "Job failed"
                       {:status errorcode
-                       :body errortext
+                       :body {:queryasyncjobresultresponse
+                              response}
                        :command opcode
                        :params params})))
-    jobresult))
+    (find-payload jobresult opcode)))
 
 (defn job-request!!
   [config opcode params]
   (auspex/chain (json-request!! config opcode params)
-                (job-loop!! config opcode)
+                (job-loop!! config)
                 (validate-job!! config opcode params)))
 
 (defn request!!
