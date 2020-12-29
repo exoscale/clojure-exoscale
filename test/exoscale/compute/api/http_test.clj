@@ -203,10 +203,11 @@
                                        {:id template-id}))
         (is false "call should have failed")
         (catch Exception e
+          (clojure.pprint/pprint e)
           (let [{:keys [response]} (ex-data e)]
             (is (= 431 (:status response))))
-          (is (= nil
-                 (ex-cause e)))
+          (is (= "HTTP Error"
+                 (ex-message e)))
           #_(let [{:keys [body status]} (ex-data e)]
               (is (= status 431)
                   (= (json/parse-string body)
