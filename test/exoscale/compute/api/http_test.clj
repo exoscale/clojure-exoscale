@@ -129,25 +129,25 @@
                              :queryAsyncJobResult (constantly {:status 200
                                                                :body job-resp})}
       (try
-        (auspex/unwrap (http/request!! {:endpoint "http://localhost:8080"
-                                        :api-key "foo"
-                                        :api-secret "bar"
-                                        :throw-on-job-failure? true}
-                                       "deleteSnapshot"
-                                       {:id (rand-uuid)}))
+        (deref (http/request!! {:endpoint "http://localhost:8080"
+                                :api-key "foo"
+                                :api-secret "bar"
+                                :throw-on-job-failure? true}
+                               "deleteSnapshot"
+                               {:id (rand-uuid)}))
         (is false "call should have failed")
         (catch Exception e
-          (let [{:keys [status body]} (ex-data e)]
+          (let [{:keys [status body]} (ex-data (ex-cause e))]
             (is (= 530
                    status))
             (is (= job-resp
                    (json/parse-string body true))))))
       (is (= job-result
-             (auspex/unwrap (http/request!! {:endpoint "http://localhost:8080"
-                                             :api-key "foo"
-                                             :api-secret "bar"}
-                                            "deleteSnapshot"
-                                            {:id (rand-uuid)})))))))
+             (deref (http/request!! {:endpoint "http://localhost:8080"
+                                     :api-key "foo"
+                                     :api-secret "bar"}
+                                    "deleteSnapshot"
+                                    {:id (rand-uuid)})))))))
 
 (deftest async-job-handling
   (let [job-id (rand-uuid)
@@ -163,17 +163,17 @@
                              :queryAsyncJobResult (constantly {:status 200
                                                                :body job-resp})}
       (is (= job-result
-             (auspex/unwrap (http/request!! {:endpoint "http://localhost:8080"
-                                             :api-key "foo"
-                                             :api-secret "bar"}
-                                            "deleteSnapshot"
-                                            {:id (rand-uuid)}))
-             (auspex/unwrap (http/request!! {:endpoint "http://localhost:8080"
-                                             :api-key "foo"
-                                             :api-secret "bar"
-                                             :throw-on-job-failure? true}
-                                            "deleteSnapshot"
-                                            {:id (rand-uuid)})))))))
+             (deref (http/request!! {:endpoint "http://localhost:8080"
+                                     :api-key "foo"
+                                     :api-secret "bar"}
+                                    "deleteSnapshot"
+                                    {:id (rand-uuid)}))
+             (deref (http/request!! {:endpoint "http://localhost:8080"
+                                     :api-key "foo"
+                                     :api-secret "bar"
+                                     :throw-on-job-failure? true}
+                                    "deleteSnapshot"
+                                    {:id (rand-uuid)})))))))
 (deftest listing-commands
   (let [template-id (rand-uuid)
         error       (format "Unable to execute API command listtemplates due to invalid value. entity %s does not exist." template-id)
@@ -189,20 +189,20 @@
                              :listTemplates (constantly {:status 431
                                                          :body error-resp})}
       (is (= []
-             (auspex/unwrap (http/request!! {:endpoint "http://localhost:8080"
-                                             :api-key "foo"
-                                             :api-secret "bar"}
-                                            "listVirtualMachines"
-                                            {}))))
+             (deref (http/request!! {:endpoint "http://localhost:8080"
+                                     :api-key "foo"
+                                     :api-secret "bar"}
+                                    "listVirtualMachines"
+                                    {}))))
       (try
-        (auspex/unwrap (http/request!! {:endpoint "http://localhost:8080"
-                                        :api-key "foo"
-                                        :api-secret "bar"}
-                                       "listTemplates"
-                                       {:id template-id}))
+        (deref (http/request!! {:endpoint "http://localhost:8080"
+                                :api-key "foo"
+                                :api-secret "bar"}
+                               "listTemplates"
+                               {:id template-id}))
         (is false "call should have failed")
         (catch Exception e
-          (let [{:keys [body status]} (ex-data e)]
+          (let [{:keys [body status]} (ex-data (ex-cause e))]
             (is (= 431 status))
             (is (= error-resp
                    (json/parse-string body true)))))))))
