@@ -37,15 +37,15 @@
   [d]
   (auspex/catch d clojure.lang.ExceptionInfo
     (fn [e]
-      (let [d (ex-data e)]
-        (throw (if-let [body (:body d)]
-                 (ex-info (ex-message e)
-                          (assoc d :body
-                                 (cond-> body
-                                   (instance? InputStream body)
-                                   slurp))
-                          (ex-cause e))
-                 e))))))
+      (let [d (:response (ex-data e))]
+        (throw
+         (ex-info (ex-message e)
+                  (update d
+                          :body
+                          #(cond-> %
+                             (instance? InputStream %)
+                             slurp))
+                  (ex-cause e)))))))
 
 (def list-command?
   (memoize
@@ -58,6 +58,12 @@
   (cond-> {}
     request-timeout
     (assoc :exoscale.telex.request/timeout request-timeout)))
+
+(defn parse-body [response]
+  (update response
+          :body
+          #(json/parse-stream (io/reader %)
+                              true)))
 
 (defn raw-request!!
   "Send an HTTP request"
@@ -74,11 +80,7 @@
                                        :method method)
                           (= :post method)
                           (assoc :headers {:content-type "application/x-www-form-urlencoded"})))
-        (auspex/chain (fn [response]
-                        (update response
-                                :body
-                                #(json/parse-stream (io/reader %)
-                                                    true))))
+        (auspex/chain parse-body)
         with-decoded-error-body)))
 
 (defn extract-response
@@ -165,14 +167,17 @@
       resp)))
 
 (defn validate-job!!
+  "Closure that will:
+   - return jobresult if job was succesful
+   - throw ex-info in case of failure (body is a string to mimic behavior of other query exceptions)"
   [config opcode params]
   (fn [{{:keys [errortext errorcode] :as jobresult} :jobresult :as response}]
     (when (and (:throw-on-job-failure? config)
                (some? errortext))
       (throw (ex-info "Job failed"
                       {:status errorcode
-                       :body {:queryasyncjobresultresponse
-                              response}
+                       :body (json/generate-string {:queryasyncjobresultresponse
+                                                    response})
                        :command opcode
                        :params params})))
     (find-payload jobresult opcode)))

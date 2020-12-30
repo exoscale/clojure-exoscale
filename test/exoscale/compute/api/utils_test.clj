@@ -15,7 +15,7 @@
         (throw (ex-info "Command not implemented" {:command command
                                                    :params params}))))))
 
-(defmacro with-http
+(defmacro with-server
   [port handlers & body]
   `(let [app# (-> (make-app ~handlers)
                   wrap-keyword-params

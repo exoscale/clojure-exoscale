@@ -123,11 +123,11 @@
                    :jobid  (str job-id)
                    :jobstatus 2
                    :jobresult job-result}}]
-    (utils/with-http 8080 {:deleteSnapshot       (constantly {:status 200
-                                                              :body {:deletesnapshotresponse
-                                                                     {:jobid job-id}}})
-                           :queryAsyncJobResult (constantly {:status 200
-                                                             :body job-resp})}
+    (utils/with-server 8080 {:deleteSnapshot       (constantly {:status 200
+                                                                :body {:deletesnapshotresponse
+                                                                       {:jobid job-id}}})
+                             :queryAsyncJobResult (constantly {:status 200
+                                                               :body job-resp})}
       (try
         (auspex/unwrap (http/request!! {:endpoint "http://localhost:8080"
                                         :api-key "foo"
@@ -141,8 +141,7 @@
             (is (= 530
                    status))
             (is (= job-resp
-                   ;; (json/parse-string body)
-                   body)))))
+                   (json/parse-string body true))))))
       (is (= job-result
              (auspex/unwrap (http/request!! {:endpoint "http://localhost:8080"
                                              :api-key "foo"
@@ -158,11 +157,11 @@
                    :jobid  (str job-id)
                    :jobstatus 1
                    :jobresult job-result}}]
-    (utils/with-http 8080 {:deleteSnapshot       (constantly {:status 200
-                                                              :body {:deletesnapshotresponse
-                                                                     {:jobid job-id}}})
-                           :queryAsyncJobResult (constantly {:status 200
-                                                             :body job-resp})}
+    (utils/with-server 8080 {:deleteSnapshot       (constantly {:status 200
+                                                                :body {:deletesnapshotresponse
+                                                                       {:jobid job-id}}})
+                             :queryAsyncJobResult (constantly {:status 200
+                                                               :body job-resp})}
       (is (= job-result
              (auspex/unwrap (http/request!! {:endpoint "http://localhost:8080"
                                              :api-key "foo"
@@ -182,13 +181,13 @@
                      {:cserrorcode 9999
                       :errorcode 431
                       :errortext error}}]
-    (utils/with-http 8080 {:listVirtualMachines  (constantly {:status 200
-                                                              :body {:listvirtualmachinesresponse
-                                                                     {:count 0
-                                                                      :virtualmachine []}}})
+    (utils/with-server 8080 {:listVirtualMachines  (constantly {:status 200
+                                                                :body {:listvirtualmachinesresponse
+                                                                       {:count 0
+                                                                        :virtualmachine []}}})
 
-                           :listTemplates (constantly {:status 431
-                                                       :body error-resp})}
+                             :listTemplates (constantly {:status 431
+                                                         :body error-resp})}
       (is (= []
              (auspex/unwrap (http/request!! {:endpoint "http://localhost:8080"
                                              :api-key "foo"
@@ -203,12 +202,7 @@
                                        {:id template-id}))
         (is false "call should have failed")
         (catch Exception e
-          (clojure.pprint/pprint e)
-          (let [{:keys [response]} (ex-data e)]
-            (is (= 431 (:status response))))
-          (is (= "HTTP Error"
-                 (ex-message e)))
-          #_(let [{:keys [body status]} (ex-data e)]
-              (is (= status 431)
-                  (= (json/parse-string body)
-                     error-resp))))))))
+          (let [{:keys [body status]} (ex-data e)]
+            (is (= 431 status))
+            (is (= error-resp
+                   (json/parse-string body true)))))))))
