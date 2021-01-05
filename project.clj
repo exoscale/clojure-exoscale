@@ -18,6 +18,8 @@
                  [toml                "0.1.3"]
                  [exoscale/cloak      "0.1.3"]]
   :pedantic? :abort
-  :profiles {:dev {:dependencies [[tortue/spy "2.4.0"]]
+  :profiles {:dev {:dependencies [[tortue/spy                 "2.4.0"]
+                                  [ring/ring-jetty-adapter    "1.7.1"]
+                                  [ring/ring-json             "0.5.0"]]
                    :global-vars  {*warn-on-reflection* true}
                    :pedantic?    :warn}})

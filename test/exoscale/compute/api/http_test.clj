@@ -2,6 +2,8 @@
   (:require [clojure.test :refer [deftest testing is]]
             [qbits.auspex :as auspex]
             [exoscale.compute.api.http :as http]
+            [exoscale.compute.api.utils-test :as utils]
+            [cheshire.core :as json]
             [spy.core :as spy]
             [spy.assert :as assert]))
 
@@ -109,3 +111,98 @@
         (assert/called-n-times? spy 2)
         (assert/called-with? spy {} "listZones" {:page 1 :pagesize 500})
         (assert/called-with? spy {} "listZones" {:page 2 :pagesize 500})))))
+
+(defn rand-uuid [] (java.util.UUID/randomUUID))
+
+(deftest throw-on-job-failure-when-configured
+  (let [job-id (rand-uuid)
+        job-result {:errortext "Failed to delete snapshot:com.cloud.exception.InvalidParameterValueException: Can't delete snapshot 75136 with status BackingUp"
+                    :errorcode 530}
+        job-resp {:queryasyncjobresultresponse
+                  {:cmd "org.apache.cloudstack.api.command.user.snapshot.DeleteSnapshotCmd"
+                   :jobid  (str job-id)
+                   :jobstatus 2
+                   :jobresult job-result}}]
+    (utils/with-server 8080 {:deleteSnapshot       (constantly {:status 200
+                                                                :body {:deletesnapshotresponse
+                                                                       {:jobid job-id}}})
+                             :queryAsyncJobResult (constantly {:status 200
+                                                               :body job-resp})}
+      (try
+        (deref (http/request!! {:endpoint "http://localhost:8080"
+                                :api-key "foo"
+                                :api-secret "bar"
+                                :throw-on-job-failure? true}
+                               "deleteSnapshot"
+                               {:id (rand-uuid)}))
+        (is false "call should have failed")
+        (catch Exception e
+          (let [{:keys [status body]} (ex-data (ex-cause e))]
+            (is (= 530
+                   status))
+            (is (= job-resp
+                   (json/parse-string body true))))))
+      (is (= job-result
+             (deref (http/request!! {:endpoint "http://localhost:8080"
+                                     :api-key "foo"
+                                     :api-secret "bar"}
+                                    "deleteSnapshot"
+                                    {:id (rand-uuid)})))))))
+
+(deftest async-job-handling
+  (let [job-id (rand-uuid)
+        job-result {:success true}
+        job-resp {:queryasyncjobresultresponse
+                  {:cmd "org.apache.cloudstack.api.command.user.snapshot.DeleteSnapshotCmd"
+                   :jobid  (str job-id)
+                   :jobstatus 1
+                   :jobresult job-result}}]
+    (utils/with-server 8080 {:deleteSnapshot       (constantly {:status 200
+                                                                :body {:deletesnapshotresponse
+                                                                       {:jobid job-id}}})
+                             :queryAsyncJobResult (constantly {:status 200
+                                                               :body job-resp})}
+      (is (= job-result
+             (deref (http/request!! {:endpoint "http://localhost:8080"
+                                     :api-key "foo"
+                                     :api-secret "bar"}
+                                    "deleteSnapshot"
+                                    {:id (rand-uuid)}))
+             (deref (http/request!! {:endpoint "http://localhost:8080"
+                                     :api-key "foo"
+                                     :api-secret "bar"
+                                     :throw-on-job-failure? true}
+                                    "deleteSnapshot"
+                                    {:id (rand-uuid)})))))))
+(deftest listing-commands
+  (let [template-id (rand-uuid)
+        error       (format "Unable to execute API command listtemplates due to invalid value. entity %s does not exist." template-id)
+        error-resp  {:listtemplatesresponse
+                     {:cserrorcode 9999
+                      :errorcode 431
+                      :errortext error}}]
+    (utils/with-server 8080 {:listVirtualMachines  (constantly {:status 200
+                                                                :body {:listvirtualmachinesresponse
+                                                                       {:count 0
+                                                                        :virtualmachine []}}})
+
+                             :listTemplates (constantly {:status 431
+                                                         :body error-resp})}
+      (is (= []
+             (deref (http/request!! {:endpoint "http://localhost:8080"
+                                     :api-key "foo"
+                                     :api-secret "bar"}
+                                    "listVirtualMachines"
+                                    {}))))
+      (try
+        (deref (http/request!! {:endpoint "http://localhost:8080"
+                                :api-key "foo"
+                                :api-secret "bar"}
+                               "listTemplates"
+                               {:id template-id}))
+        (is false "call should have failed")
+        (catch Exception e
+          (let [{:keys [body status]} (ex-data (ex-cause e))]
+            (is (= 431 status))
+            (is (= error-resp
+                   (json/parse-string body true)))))))))
