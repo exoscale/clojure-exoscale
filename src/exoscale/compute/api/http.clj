@@ -62,8 +62,9 @@
 (defn parse-body [response]
   (update response
           :body
-          #(json/parse-stream (io/reader %)
-                              true)))
+          #(some-> %
+                   (io/reader)
+                   (json/parse-stream true))))
 
 (defn raw-request!!
   "Send an HTTP request"
