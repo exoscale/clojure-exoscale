@@ -14,9 +14,9 @@
 
   :dependencies [[org.clojure/clojure "1.10.1"]
                  [cheshire            "5.10.0"]
-                 [exoscale/telex      "0.1.0"]
+                 [exoscale/telex      "0.1.2"]
                  [toml                "0.1.3"]
-                 [exoscale/cloak      "0.1.3"]]
+                 [exoscale/cloak      "0.1.6"]]
   :pedantic? :abort
   :profiles {:dev {:dependencies [[tortue/spy                 "2.4.0"]
                                   [ring/ring-jetty-adapter    "1.7.1"]
