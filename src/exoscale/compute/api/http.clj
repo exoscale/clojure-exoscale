@@ -50,7 +50,11 @@
 (def list-command?
   (memoize
    (fn [opcode]
-     (-> opcode name (str/starts-with? "list")))))
+     (let [opcode (name opcode)]
+       (or (str/starts-with? opcode "list")
+           ;; we need to make sure we deal with get* calls the same
+           ;; way as for lists (ex for getInstancePool)
+           (str/starts-with? opcode "get"))))))
 
 (defn opts->http-request-opts
   "Converts legacy request opts to jdk11 client opts"
@@ -92,7 +96,6 @@
 (defn find-payload
   [resp opcode]
   (let [list?      (list-command? opcode)
-        ks         (set (keys resp))
         payload    (-> resp (dissoc :count) vals first)
         elem-count (:count resp)]
     (cond
