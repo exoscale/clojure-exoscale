@@ -206,3 +206,16 @@
             (is (= 431 status))
             (is (= error-resp
                    (json/parse-string body true)))))))))
+
+(deftest direct-non-list-response
+  (let [payload {:id "yolo" :name "ipool"}]
+    (utils/with-server 8080 {:getInstancePool (constantly {:status 200
+                                                           :body {:getinstancepoolresponse
+                                                                  {:count 1
+                                                                   :instancepool [payload]}}})}
+      (is (= [payload]
+             (deref (http/request!! {:endpoint "http://localhost:8080"
+                                     :api-key "foo"
+                                     :api-secret "bar"}
+                                    "getInstancePool"
+                                    payload)))))))
