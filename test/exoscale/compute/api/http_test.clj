@@ -218,4 +218,15 @@
                                      :api-key "foo"
                                      :api-secret "bar"}
                                     "getInstancePool"
+                                    payload)))))
+
+    (utils/with-server 8080 {:createInstancePool (constantly {:status 200
+                                                              :body {:createinstancepoolresponse
+                                                                     {:count 1
+                                                                      :instancepool [payload]}}})}
+      (is (= [payload]
+             (deref (http/request!! {:endpoint "http://localhost:8080"
+                                     :api-key "foo"
+                                     :api-secret "bar"}
+                                    "createInstancePool"
                                     payload)))))))
