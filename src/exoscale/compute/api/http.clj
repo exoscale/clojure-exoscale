@@ -51,10 +51,7 @@
   (memoize
    (fn [opcode]
      (let [opcode (name opcode)]
-       (or (str/starts-with? opcode "list")
-           ;; we need to make sure we deal with get* calls the same
-           ;; way as for lists (ex for getInstancePool)
-           (str/starts-with? opcode "get"))))))
+       (str/starts-with? opcode "list")))))
 
 (defn opts->http-request-opts
   "Converts legacy request opts to jdk11 client opts"
@@ -171,26 +168,29 @@
       resp)))
 
 (defn validate-job!!
-  "Closure that will:
-   - return jobresult if job was succesful
-   - throw ex-info in case of failure (body is a string to mimic behavior of other query exceptions)"
-  [config opcode params]
-  (fn [{{:keys [errortext errorcode] :as jobresult} :jobresult :as response}]
-    (when (and (:throw-on-job-failure? config)
-               (some? errortext))
-      (throw (ex-info "Job failed"
-                      {:status errorcode
-                       :body (json/generate-string {:queryasyncjobresultresponse
-                                                    response})
-                       :command opcode
-                       :params params})))
-    (find-payload jobresult opcode)))
+  "* return jobresult if job was successful
+  * throw ex-info in case of failure (body is a string to mimic
+  behavior of other query exceptions)"
+  [{{:keys [errortext errorcode] :as jobresult} :jobresult :as response}
+   config opcode params]
+  (when (and (:throw-on-job-failure? config)
+             (some? errortext))
+    (throw (ex-info "Job failed"
+                    {:status errorcode
+                     :body (json/generate-string {:queryasyncjobresultresponse
+                                                  response})
+                     :command opcode
+                     :params params})))
+  (find-payload jobresult opcode))
 
 (defn job-request!!
   [config opcode params]
   (auspex/chain (json-request!! config opcode params)
                 (job-loop!! config)
-                (validate-job!! config opcode params)))
+                (fn [response]
+                  (if (:jobresult response)
+                    (validate-job!! response config opcode params)
+                    response))))
 
 (defn request!!
   "Send a request to the API and figure out the best course of action
