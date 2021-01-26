@@ -9,7 +9,8 @@
   (:import (java.io InputStream)))
 
 (def default-client
-  (delay (client/client #:exoscale.telex.client{:connect-timeout 10000})))
+  (delay (client/client #:exoscale.telex.client{:connect-timeout 10000
+                                                :version :http_1_1})))
 
 (def default-page-size
   "Number of records to fetch by default"
