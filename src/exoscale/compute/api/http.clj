@@ -71,7 +71,7 @@
 (defn raw-request!!
   "Send an HTTP request"
   [{:keys [endpoint http-opts client method]
-    :or {method :get}
+    :or {method :post}
     :as _config} payload]
   (let [opts   (merge default-http-opts http-opts {:as :json})
         method (some-> method name str/lower-case keyword)
