@@ -16,7 +16,7 @@
                  [cheshire            "5.10.0"]
                  [exoscale/telex      "0.1.5"]
                  [toml                "0.1.3"]
-                 [exoscale/cloak      "0.1.6"]]
+                 [exoscale/cloak      "0.1.8"]]
   :pedantic? :abort
   :profiles {:dev {:dependencies [[tortue/spy                 "2.4.0"]
                                   [ring/ring-jetty-adapter    "1.7.1"]
