@@ -80,9 +80,6 @@
          params (cloak/unmask params)
          payload (-> (sanitize-lists params)
                      (assoc :apiKey api-key :response "json")
-                     (merge (expiry/args ttl)))
-         sign (cond-> (str/blank? (cloak/unmask api-secret))
-                ((throw (IllegalArgumentException.
-                         "cannot sign payload without api-secret")))
-                ((sign (query-args payload) api-secret)))]
-     (assoc payload :signature sign))))
+                     (merge (expiry/args ttl)))]
+     (cond-> payload
+       (false? (str/blank? api-secret)) (assoc :signature (sign (query-args payload) api-secret))))))
