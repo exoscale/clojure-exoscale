@@ -44,4 +44,18 @@
               :expires "2019-01-01T00:10:00+0000"
               :signature "O0Dpq8eI8F+UbjqFs0LOhgQXfV0="}
              payload)
-          "we can decode cloaked params and config"))))
+          "we can decode cloaked params and config"))
+    
+    (let [payload (build-payload
+                   {:expiration 3600}
+                   :someApiCall
+                   {:arg1 "test"
+                    :arg2 (cloak/mask 42)})]
+      (is (= {:arg1 "test"
+              :arg2 42
+              :command :someApiCall
+              :apiKey nil
+              :response "json"
+              :signatureVersion "3"
+              :expires "2019-01-01T00:10:00+0000"}
+             payload)))))
