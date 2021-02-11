@@ -81,4 +81,6 @@
          payload (-> (sanitize-lists params)
                      (assoc :apiKey api-key :response "json")
                      (merge (expiry/args ttl)))]
-     (assoc payload :signature (sign (query-args payload) api-secret)))))
+     (cond-> payload
+       (not (str/blank? api-secret))
+       (assoc :signature (sign (query-args payload) api-secret))))))
