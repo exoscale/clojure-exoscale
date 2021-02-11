@@ -82,5 +82,5 @@
                      (assoc :apiKey api-key :response "json")
                      (merge (expiry/args ttl)))]
      (cond-> payload
-       (false? (str/blank? api-secret))
+       (not (str/blank? api-secret))
        (assoc :signature (sign (query-args payload) api-secret))))))
