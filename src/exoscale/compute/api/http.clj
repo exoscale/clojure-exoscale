@@ -84,9 +84,7 @@
 (defn parse-body [response opts]
   (update response
           :body
-          (fn [body]
-            (deref (read-body-with-timeout! body
-                                            (:read-body-timeout opts))))))
+          #(read-body-with-timeout! % (:read-body-timeout opts))))
 
 (defn raw-request!!
   "Send an HTTP request"
@@ -103,7 +101,7 @@
                                        :method method)
                           (= :post method)
                           (assoc :headers {:content-type "application/x-www-form-urlencoded"})))
-        (auspex/chain parse-body)
+        (auspex/chain #(parse-body % opts))
         with-decoded-error-body)))
 
 (defn extract-response
