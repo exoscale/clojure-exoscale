@@ -5,7 +5,8 @@
             [exoscale.compute.api.utils-test :as utils]
             [cheshire.core :as json]
             [spy.core :as spy]
-            [spy.assert :as assert]))
+            [spy.assert :as assert])
+  (:import (java.io InputStream)))
 
 (deftest find-payload-test
   (testing "map with a top level key"
@@ -230,3 +231,19 @@
                                      :api-secret "bar"}
                                     "createInstancePool"
                                     payload)))))))
+
+(deftest body-read-test
+  (is (= []
+         (http/read-body-with-timeout! (clojure.java.io/input-stream (.getBytes "[]"))
+                                       10)))
+  (let [closed? (atom false)
+        input-stream (proxy [InputStream] []
+                       (read ^int
+                         ([^bytes bytes _ _]
+                          (Thread/sleep 200)
+                          "not json"))
+                       (close [] (reset! closed? true)))]
+    (is (thrown? clojure.lang.ExceptionInfo
+                 (http/read-body-with-timeout! input-stream
+                                               100)))
+    (is @closed? "make sure it was auto-closed")))
