@@ -5,7 +5,8 @@
             [clojure.string               :as str]
             [exoscale.compute.api.payload :as payload]
             [exoscale.telex               :as client]
-            [qbits.auspex                 :as auspex])
+            [qbits.auspex                 :as auspex]
+            [qbits.auspex.executor        :as exec])
   (:import (java.io InputStream)))
 
 (def default-client
@@ -30,7 +31,8 @@
 
 (def default-http-opts
   "Default HTTP options passed to the underlying HTTP library (aleph)."
-  {:request-timeout 10000})
+  {:request-timeout 10000
+   :read-body-timeout 3000})
 
 (defn with-decoded-error-body
   "Catches potential deferred error and rethrow with decoded
@@ -61,12 +63,30 @@
     request-timeout
     (assoc :exoscale.telex.request/timeout request-timeout)))
 
-(defn parse-body [response]
+(defonce read-body-executor (delay (exec/fixed-size-executor {:num-threads 4})))
+
+(defn read-body-with-timeout!
+  "In some extreme cases we can have the underling http client not close
+  the input stream for us (ex: empty headers, broken/partial
+  response), so we try decoding the body in a separate thread and
+  manually close the inputstream after `timeout` (or upon errors)"
+  [^InputStream input-stream timeout]
+  (when input-stream
+    (with-open [is input-stream
+                rdr (io/reader is)]
+      (let [f (auspex/future (fn [] (json/parse-stream rdr true))
+                             @read-body-executor)
+            json-body (deref f timeout ::timeout)]
+        (when (= ::timeout json-body)
+          (throw (ex-info "Timeout while reading body" {})))
+        json-body))))
+
+(defn parse-body [response opts]
   (update response
           :body
-          #(some-> %
-                   (io/reader)
-                   (json/parse-stream true))))
+          (fn [body]
+            (deref (read-body-with-timeout! body
+                                            (:read-body-timeout opts))))))
 
 (defn raw-request!!
   "Send an HTTP request"
