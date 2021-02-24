@@ -5,6 +5,7 @@
             [exoscale.compute.api.utils-test :as utils]
             [cheshire.core :as json]
             [spy.core :as spy]
+            [clojure.java.io :as io]
             [spy.assert :as assert])
   (:import (java.io InputStream)))
 
@@ -234,8 +235,9 @@
 
 (deftest body-read-test
   (is (= []
-         (http/read-body-with-timeout! (clojure.java.io/input-stream (.getBytes "[]"))
-                                       10)))
+         (http/read-body-with-timeout! (io/input-stream (.getBytes "[]"))
+                                       10
+                                       @http/default-read-body-executor)))
   (let [closed? (atom false)
         input-stream (proxy [InputStream] []
                        (read ^int
@@ -245,5 +247,6 @@
                        (close [] (reset! closed? true)))]
     (is (thrown? clojure.lang.ExceptionInfo
                  (http/read-body-with-timeout! input-stream
-                                               100)))
+                                               100
+                                               @http/default-read-body-executor)))
     (is @closed? "make sure it was auto-closed")))

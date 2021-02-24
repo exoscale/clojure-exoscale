@@ -63,19 +63,19 @@
     request-timeout
     (assoc :exoscale.telex.request/timeout request-timeout)))
 
-(defonce read-body-executor (delay (exec/fixed-size-executor {:num-threads 4})))
+(defonce default-read-body-executor (delay (exec/fixed-size-executor {:num-threads 4})))
 
 (defn read-body-with-timeout!
   "In some extreme cases we can have the underling http client not close
   the input stream for us (ex: empty headers, broken/partial
   response), so we try decoding the body in a separate thread and
   manually close the inputstream after `timeout` (or upon errors)"
-  [^InputStream input-stream timeout]
+  [^InputStream input-stream timeout executor]
   (when input-stream
     (with-open [is input-stream
                 rdr (io/reader is)]
       (let [f (auspex/future (fn [] (json/parse-stream rdr true))
-                             @read-body-executor)
+                             executor)
             json-body (deref f timeout ::timeout)]
         (when (= ::timeout json-body)
           (throw (ex-info "Timeout while reading body" {})))
@@ -84,7 +84,10 @@
 (defn parse-body [response opts]
   (update response
           :body
-          #(read-body-with-timeout! % (:read-body-timeout opts))))
+          #(read-body-with-timeout! %
+                                    (:read-body-timeout opts)
+                                    (or (:read-body-executor opts)
+                                        @default-read-body-executor))))
 
 (defn raw-request!!
   "Send an HTTP request"
