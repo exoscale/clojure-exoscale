@@ -72,12 +72,12 @@
   manually close the inputstream after `timeout` (or upon errors)"
   [^InputStream input-stream timeout executor]
   (when input-stream
-    (with-open [is input-stream
-                rdr (io/reader is)]
+    (with-open [rdr (io/reader is)]
       (let [f (auspex/future (fn [] (json/parse-stream rdr true))
                              executor)
             json-body (deref f timeout ::timeout)]
         (when (= ::timeout json-body)
+          (.close input-stream)
           (throw (ex-info "Timeout while reading body" {})))
         json-body))))
 
