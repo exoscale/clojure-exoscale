@@ -14,7 +14,7 @@
 
   :dependencies [[org.clojure/clojure "1.10.1"]
                  [cheshire            "5.10.0"]
-                 [exoscale/telex      "0.1.5"]
+                 [exoscale/telex      "0.1.6"]
                  [toml                "0.1.3"]
                  [exoscale/cloak      "0.1.8"]]
   :pedantic? :abort
