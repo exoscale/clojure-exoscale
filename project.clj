@@ -1,4 +1,4 @@
-(defproject exoscale/exoscale "0.2.10"
+(defproject exoscale/exoscale "0.2.11-SNAPSHOT"
   :description "All things Exoscale, in Clojure"
   :url "https://github.com/exoscale/clojure-exoscale"
   :plugins [[lein-kibit      "0.1.6"]
