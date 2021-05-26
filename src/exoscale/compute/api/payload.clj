@@ -26,27 +26,31 @@
   [[k v]]
   (str (name k) "=" (url-encode v)))
 
+(defn transform-map
+  "For a map, produce the expected key/value pairs."
+  [param m i]
+  (for [[k v] m]
+    [(format "%s[%d].%s" (name param) i (name k))  (stringify v)]))
+
 (defn transform-maps
   "For a list of maps, produce the expected key/value pairs."
-  [param maps]
-  (for [[[k v] i] (partition 2 (interleave maps (range)))]
-    [(format "%s[%d].%s" param i (name k) (str v))]))
+  [param ms]
+  (mapcat (partial transform-map param) ms (range)))
 
 (defn transform-arg
   "Transform argument into a list of key/value pairs."
   [[k v]]
-  (let [k (name k)
-        v (stringify v)]
+  (let [k (name k)]
     (when (or (and (sequential? v) (seq v)) (some? v))
       (cond
         (and (sequential? v) (-> v first map?))
-        (transform-maps (name k) v)
+        (transform-maps k v)
 
         (sequential? v)
         (map #(vector k (stringify %)) v)
 
         :else
-        [[k (str v)]]))))
+        [[k (stringify v)]]))))
 
 (defn query-args
   "Build arguments, ready to be signed."
@@ -59,17 +63,23 @@
 (defn sign
   "Sign the given query"
   [query api-secret]
-  (hmac/sha1 api-secret (-> query str/lower-case quote-plus))
-;;  (-> query str/lower-case quote-plus)
-  )
+  (hmac/sha1 api-secret (-> query str/lower-case quote-plus)))
 
-(defn sanitize-lists
+(defn assoc-value
+  [m k v]
+  (cond
+    (and (sequential? v) (map? (first v)))
+    (merge m (reduce merge {} (transform-maps k v)))
+
+    (sequential? v)
+    (assoc m k (str/join "," (map stringify v)))
+
+    :else
+    (assoc m k v)))
+
+(defn sanitize
   [params]
-  (let [flat-list?    #(and (sequential? %) (not (map? (first %))))
-        sanitize-list #(str/join "," (map stringify %))]
-    (reduce-kv #(assoc %1 %2 (cond-> %3 (flat-list? %3) sanitize-list))
-               {}
-               params)))
+  (reduce-kv assoc-value {} params))
 
 (defn build-payload
   "Build a signed payload for a given config, opcode and args triplet"
@@ -78,7 +88,7 @@
   ([config params]
    (let [{:keys [api-key api-secret ttl]} (cloak/unmask config)
          params (cloak/unmask params)
-         payload (-> (sanitize-lists params)
+         payload (-> (sanitize params)
                      (assoc :apiKey api-key :response "json")
                      (merge (expiry/args ttl)))]
      (cond-> payload
