@@ -11,7 +11,8 @@ jobs:
 
       - uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
         with:
-          java-version: '11'
+          distribution: 'temurin'
+          java-version: '21'
 
       - name: Install leiningen
         uses: DeLaGuardo/setup-clojure@4c7a6f613e5089821bb3bb2a33a3ee115578580d # 13.6.1
